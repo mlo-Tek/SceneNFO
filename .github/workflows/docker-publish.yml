@@ -17,6 +17,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate frontend JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in app/static/*.js; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
