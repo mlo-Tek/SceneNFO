@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  python:
+  app:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,11 +14,24 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Compile Python sources
         run: python -m compileall -q app
+
+      - name: Validate frontend JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in app/static/*.js; do
+            echo "Checking $file"
+            node --check "$file"
+          done
 
       - name: Validate P2P group seed
         shell: bash
