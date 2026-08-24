@@ -14,6 +14,8 @@
     crowdnfo: 'crowdNFO',
   }[String(source || '').toLowerCase()] || String(source || ''));
 
+  const downloadedFrom = source => source ? `Downloaded from ${sourceLabel(source)}` : '';
+
   const localTime = value => {
     if (!value) return '';
     const d = new Date(value);
@@ -59,7 +61,7 @@
       setTimeout(() => {
         const status = document.querySelector('#item-operation-status');
         if (status) {
-          status.textContent = `Browser download complete · Source: ${source} · No files were written to or changed in the media folder.`;
+          status.textContent = `Browser download complete · Downloaded from ${source} · No files were written to or changed in the media folder.`;
           status.className = 'item-operation-status ok';
         }
         enhanceItemManager();
@@ -94,12 +96,12 @@
     const installed = item.nfo_source ? sourceLabel(item.nfo_source) : '';
     const browser = item.browser_nfo_source ? sourceLabel(item.browser_nfo_source) : '';
     const installedText = installed
-      ? `<span class="source-installed">Media folder · ${esc(installed)}</span>`
+      ? `<span class="source-installed">Downloaded from ${esc(installed)}</span>`
       : item.nfo_present
-        ? '<span class="source-unknown">Media folder · Local / Unknown</span>'
-        : '<span class="source-none">No installed NFO source</span>';
+        ? '<span class="source-unknown">Source unknown</span>'
+        : '<span class="source-none">No NFO installed</span>';
     const browserText = browser
-      ? `<span class="source-browser">Browser only · ${esc(browser)}${item.browser_nfo_downloaded_at ? ` · ${esc(localTime(item.browser_nfo_downloaded_at))}` : ''}</span>`
+      ? `<span class="source-browser">Browser only · Downloaded from ${esc(browser)}${item.browser_nfo_downloaded_at ? ` · ${esc(localTime(item.browser_nfo_downloaded_at))}` : ''}</span>`
       : '';
     return `<div class="nfo-source-stack">${installedText}${browserText}</div>`;
   }
@@ -113,7 +115,7 @@
     if (!rows.length || rows.length !== trs.length) return;
 
     const headers = [...table.querySelectorAll('thead th')];
-    if (headers[5]) headers[5].textContent = 'NFO source';
+    if (headers[5]) headers[5].textContent = 'NFO Source';
 
     trs.forEach((tr, index) => {
       const cells = tr.querySelectorAll('td');
@@ -139,29 +141,39 @@
       actionBox.insertAdjacentElement('afterend', notice);
     }
 
-    const sourceMeta = [...panel.querySelectorAll('.item-meta')].find(el => el.querySelector('span')?.textContent.trim() === 'NFO source');
-    if (sourceMeta) sourceMeta.querySelector('span').textContent = 'Media-folder NFO source';
-
-    const close = panel.querySelector('.item-manager-close');
     const itemId = Number(panel.querySelector('[data-item-id]')?.dataset?.itemId || 0);
     const item = itemDetails.get(itemId);
     const metaGrid = panel.querySelector('.item-meta-grid');
+    const sourceMeta = [...panel.querySelectorAll('.item-meta')].find(el => {
+      const label = el.querySelector('span')?.textContent.trim();
+      return label === 'NFO source' || label === 'NFO Source' || label === 'Media-folder NFO source';
+    });
+    if (sourceMeta) {
+      sourceMeta.querySelector('span').textContent = 'NFO Source';
+      const strong = sourceMeta.querySelector('strong');
+      if (strong && item) {
+        strong.textContent = item.nfo_source
+          ? downloadedFrom(item.nfo_source)
+          : item.nfo_present ? 'Source unknown' : 'No NFO installed';
+      }
+    }
+
     if (item && metaGrid && !metaGrid.querySelector('.browser-source-meta')) {
       const meta = document.createElement('div');
       meta.className = 'item-meta browser-source-meta';
-      meta.innerHTML = `<span>Last browser-only download</span><strong>${item.browser_nfo_source ? `${esc(sourceLabel(item.browser_nfo_source))}${item.browser_nfo_downloaded_at ? ` · ${esc(localTime(item.browser_nfo_downloaded_at))}` : ''}` : 'None'}</strong>`;
+      meta.innerHTML = `<span>Last browser-only download</span><strong>${item.browser_nfo_source ? `${esc(downloadedFrom(item.browser_nfo_source))}${item.browser_nfo_downloaded_at ? ` · ${esc(localTime(item.browser_nfo_downloaded_at))}` : ''}` : 'None'}</strong>`;
       metaGrid.appendChild(meta);
     } else if (item && metaGrid) {
       const strong = metaGrid.querySelector('.browser-source-meta strong');
       if (strong) strong.textContent = item.browser_nfo_source
-        ? `${sourceLabel(item.browser_nfo_source)}${item.browser_nfo_downloaded_at ? ` · ${localTime(item.browser_nfo_downloaded_at)}` : ''}`
+        ? `${downloadedFrom(item.browser_nfo_source)}${item.browser_nfo_downloaded_at ? ` · ${localTime(item.browser_nfo_downloaded_at)}` : ''}`
         : 'None';
     }
 
     if (lastBrowserDownload && lastBrowserDownload.itemId === itemId) {
       const status = panel.querySelector('#item-operation-status');
       if (status && !status.textContent.includes('No files were written')) {
-        status.textContent = `Last browser download source: ${lastBrowserDownload.source} · No media-folder files were changed.`;
+        status.textContent = `Last browser download · Downloaded from ${lastBrowserDownload.source} · No media-folder files were changed.`;
       }
     }
   }
