@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>SceneNFO</Name>
+  <Repository>scenenfo:latest</Repository>
+  <Registry>https://github.com/mlo-Tek/SceneNFO</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/mlo-Tek/SceneNFO/issues</Support>
+  <Project>https://github.com/mlo-Tek/SceneNFO</Project>
+  <Overview>SceneNFO scans Radarr and Sonarr media libraries, classifies releases as Scene or P2P using exact PreDB.club matches, manages Scene NFO files from srrDB, PreDB.club and crowdNFO, and provides live scans, history, logs, schedules and import automation.</Overview>
+  <Category>MediaApp:Other Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8787]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/mlo-Tek/SceneNFO/main/unraid/SceneNFO.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/mlo-Tek/SceneNFO/main/assets/scenenfo.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>The Docker image must first be built locally as scenenfo:latest from the SceneNFO repository. Internet access is required for PreDB.club, srrDB and crowdNFO.</Requires>
+
+  <Config Name="WebUI Port" Target="8787" Default="8787" Mode="tcp" Description="SceneNFO WebUI / API port." Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+
+  <Config Name="Appdata" Target="/config" Default="/mnt/cache/appdata/scenenfo/config" Mode="rw" Description="Persistent SceneNFO configuration, SQLite database, encrypted credentials, logs and temporary files." Type="Path" Display="always" Required="true" Mask="false">/mnt/cache/appdata/scenenfo/config</Config>
+
+  <Config Name="Media" Target="/data/media" Default="/mnt/user/data/media" Mode="rw" Description="Radarr and Sonarr media root. SceneNFO needs write access when Apply mode is used to create or replace NFO files. You can set this to read-only for initial Dry Run testing." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/data/media</Config>
+
+  <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Container timezone." Type="Variable" Display="advanced" Required="true" Mask="false">Europe/Berlin</Config>
+
+  <Config Name="Config Directory" Target="SCENENFO_CONFIG_DIR" Default="/config" Mode="" Description="Internal SceneNFO configuration directory. Normally leave this unchanged." Type="Variable" Display="advanced" Required="true" Mask="false">/config</Config>
+</Container>
