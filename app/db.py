@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS library_items (
     predb_id INTEGER,
     nfo_path TEXT,
     nfo_source TEXT,
+    browser_nfo_source TEXT,
+    browser_nfo_downloaded_at TEXT,
     nfo_present INTEGER NOT NULL DEFAULT 0,
     last_result TEXT,
     last_checked_at TEXT NOT NULL
@@ -137,6 +139,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE library_items ADD COLUMN file_size INTEGER")
     if not _has_column(conn, "library_items", "file_mtime_ns"):
         conn.execute("ALTER TABLE library_items ADD COLUMN file_mtime_ns INTEGER")
+    if not _has_column(conn, "library_items", "browser_nfo_source"):
+        conn.execute("ALTER TABLE library_items ADD COLUMN browser_nfo_source TEXT")
+    if not _has_column(conn, "library_items", "browser_nfo_downloaded_at"):
+        conn.execute("ALTER TABLE library_items ADD COLUMN browser_nfo_downloaded_at TEXT")
 
     if not _has_column(conn, "runs", "library_id"):
         conn.execute("ALTER TABLE runs ADD COLUMN library_id INTEGER REFERENCES libraries(id) ON DELETE SET NULL")
@@ -154,6 +160,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if not _has_column(conn, "schedules", "scan_scope"):
         conn.execute("ALTER TABLE schedules ADD COLUMN scan_scope TEXT NOT NULL DEFAULT 'incremental'")
 
+    # The product calls the TV section simply "TV". Rename only the old default
+    # library name and historical run labels; user-created custom names remain intact.
+    now = utcnow()
+    has_tv = conn.execute("SELECT 1 FROM libraries WHERE name='TV'").fetchone()
+    if not has_tv:
+        conn.execute("UPDATE libraries SET name='TV',updated_at=? WHERE name='TV Shows'", (now,))
+    conn.execute("UPDATE runs SET library_name='TV' WHERE library_name='TV Shows'")
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_library_items_library_id ON library_items(library_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_library_items_fingerprint ON library_items(library_id,file_size,file_mtime_ns)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_library_id ON runs(library_id)")
@@ -169,7 +183,7 @@ def _seed_default_libraries(conn: sqlite3.Connection) -> None:
     tv_path = conn.execute("SELECT value FROM settings WHERE key='tv_path'").fetchone()
     defaults = [
         ("Movies", "movies", movie_path[0] if movie_path else "/data/media/movies"),
-        ("TV Shows", "tv", tv_path[0] if tv_path else "/data/media/tv"),
+        ("TV", "tv", tv_path[0] if tv_path else "/data/media/tv"),
         ("Kids Movies", "movies", "/data/media/movies-kids"),
         ("Kids TV", "tv", "/data/media/tv-kids"),
     ]
