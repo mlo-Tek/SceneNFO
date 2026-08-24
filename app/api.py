@@ -112,7 +112,7 @@ def _match_library(kind: str, path: str | None) -> dict | None:
 
 @router.get("/health")
 def health():
-    return {"ok": True, "version": "0.2.0"}
+    return {"ok": True, "version": "0.3.1"}
 
 
 @router.get("/dashboard")
@@ -183,7 +183,7 @@ def delete_library(library_id: int):
 
 
 @router.post("/scans")
-def start_scan(body: ScanRequest):
+async def start_scan(body: ScanRequest):
     if body.nfo_policy not in {"replace_all", "missing_only"}:
         raise HTTPException(400, "nfo_policy must be replace_all or missing_only")
 
