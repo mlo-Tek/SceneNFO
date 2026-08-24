@@ -78,13 +78,46 @@
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
-      let text = node.nodeValue || '';
+      const text = node.nodeValue || '';
       const next = text
         .replaceAll('TV Shows', 'TV')
         .replaceAll('TV Episodes', 'TV')
         .replaceAll('TV episode inventory', 'TV library inventory');
       if (next !== text) node.nodeValue = next;
     }
+  }
+
+  function setupSidebarToggle() {
+    const shell = document.querySelector('.app-shell');
+    const sidebar = document.querySelector('.sidebar');
+    if (!shell || !sidebar) return;
+
+    document.querySelectorAll('.sidebar .nav').forEach(button => {
+      const label = button.querySelector('span')?.textContent?.trim();
+      if (label && !button.title) button.title = label;
+    });
+
+    let button = sidebar.querySelector('.sidebar-toggle');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'sidebar-toggle';
+      sidebar.appendChild(button);
+    }
+
+    const apply = collapsed => {
+      shell.classList.toggle('sidebar-collapsed', collapsed);
+      button.textContent = collapsed ? '›' : '‹';
+      button.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      button.setAttribute('aria-label', button.title);
+      localStorage.setItem('scenenfo-sidebar-collapsed', collapsed ? '1' : '0');
+    };
+
+    if (!button.dataset.bound) {
+      button.dataset.bound = '1';
+      button.addEventListener('click', () => apply(!shell.classList.contains('sidebar-collapsed')));
+    }
+    apply(localStorage.getItem('scenenfo-sidebar-collapsed') === '1');
   }
 
   function activeKind() {
@@ -120,6 +153,15 @@
     trs.forEach((tr, index) => {
       const cells = tr.querySelectorAll('td');
       if (cells[5] && rows[index]) cells[5].innerHTML = sourceCellHtml(rows[index]);
+    });
+  }
+
+  function enhanceCandidateNfoStates() {
+    document.querySelectorAll('.candidate-row > .candidate-action:last-child').forEach(state => {
+      const text = state.textContent.trim().toLowerCase();
+      state.classList.add('candidate-nfo-state');
+      state.classList.toggle('nfo-present', text.includes('present'));
+      state.classList.toggle('nfo-missing', text.includes('missing'));
     });
   }
 
@@ -179,8 +221,10 @@
   }
 
   function enhanceAll() {
+    setupSidebarToggle();
     renameTvEverywhere();
     enhanceLibrarySources();
+    enhanceCandidateNfoStates();
     enhanceItemManager();
   }
 
