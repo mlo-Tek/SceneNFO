@@ -26,13 +26,16 @@
       <div class="nav-label">System</div>
       <button class="nav" data-view="settings">⚙ <span>Settings</span></button>
     </nav>
-    <div class="sidebar-footer"><span class="status-dot"></span><span>SceneNFO 0.2</span></div>
+    <div class="sidebar-footer"><span class="status-dot"></span><span>SceneNFO 0.3</span></div>
   </aside>
 
   <main class="main">
     <header class="topbar">
-      <div><h1 id="page-title">Dashboard</h1><p id="page-subtitle">Your media release overview</p></div>
-      <div class="top-actions"><button class="btn secondary" id="refresh-btn">Refresh</button><button class="btn primary" id="quick-scan">Start Scan</button></div>
+      <div><h1 id="page-title">Dashboard</h1><p id="page-subtitle">Media overview and quick run</p></div>
+      <div class="top-actions">
+        <button class="btn secondary icon-btn" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">☾</button>
+        <button class="btn secondary" id="refresh-btn">Refresh</button>
+      </div>
     </header>
     <section id="content"></section>
   </main>
