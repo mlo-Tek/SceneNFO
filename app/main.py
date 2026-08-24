@@ -14,7 +14,7 @@ from .groups import seed_p2p_groups, sync_scene_groups
 from .scheduler import refresh_schedule, scheduler
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 
 @asynccontextmanager
