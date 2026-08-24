@@ -37,6 +37,52 @@
     return `${first}–${last} of ${page.total}`;
   };
 
+  const resultLabel = value => String(value || '—').replaceAll('_', ' ');
+
+  const libraryEntryHtml = item => {
+    const classification = item.classification === 'scene' ? 'scene' : 'p2p';
+    const title = item.title || item.release_name;
+    const library = item.configured_library || 'Legacy';
+    const nfoBadge = item.nfo_present
+      ? '<span class="library-nfo-present">NFO PRESENT</span>'
+      : '<span class="library-nfo-missing">NFO MISSING</span>';
+
+    return `<article class="library-entry ${classification}">
+      <div class="library-entry-main">
+        <div class="library-entry-title-row">
+          <button class="library-title-link item-folder-btn" data-item-id="${Number(item.id)}" title="Open media folder in SceneNFO">${esc(title)}</button>
+        </div>
+        <div class="library-entry-context">
+          <span class="library-name-badge">${esc(library)}</span>
+          <span class="library-release mono" title="${esc(item.release_name)}">${esc(item.release_name)}</span>
+        </div>
+        <div class="library-entry-actions">
+          <button class="btn primary item-manage-btn" data-item-id="${Number(item.id)}">Manage NFO</button>
+          <button class="btn secondary item-folder-btn" data-item-id="${Number(item.id)}">Browse folder</button>
+        </div>
+      </div>
+
+      <div class="library-entry-meta">
+        <div class="library-meta-block">
+          <span class="library-meta-label">Type</span>
+          <div>${pill(item.classification)}</div>
+        </div>
+        <div class="library-meta-block">
+          <span class="library-meta-label">Group</span>
+          <strong>${esc(item.release_group || 'Unknown')}</strong>
+        </div>
+        <div class="library-meta-block library-meta-nfo">
+          <span class="library-meta-label">NFO</span>
+          <div class="library-nfo-line">${nfoBadge}${nfoSourceHtml(item)}</div>
+        </div>
+        <div class="library-meta-block">
+          <span class="library-meta-label">Last result</span>
+          <strong class="library-result">${esc(resultLabel(item.last_result))}</strong>
+        </div>
+      </div>
+    </article>`;
+  };
+
   renderLibrary = async function(kind) {
     const title = kind === 'movies' ? 'Movies' : 'TV';
     const noun = kind === 'movies' ? 'movie' : 'TV';
@@ -51,7 +97,7 @@
 
     content.innerHTML = `<div class="card section-card library-page-card">
       <div class="section-head">
-        <div><h2>${title}</h2><p>Filter and manage the SceneNFO inventory. Results are paginated for stable performance.</p></div>
+        <div><h2>${title}</h2><p>Filter and manage the SceneNFO inventory. Click a title to browse its media folder.</p></div>
       </div>
       <div class="toolbar library-toolbar">
         <select id="lib-config"><option value="">All ${noun} libraries</option>${libs.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
@@ -60,7 +106,7 @@
         <select id="lib-nfo"><option value="">All NFO</option><option value="present">NFO present</option><option value="missing">NFO missing</option></select>
         <button class="btn secondary" id="lib-filter">Apply filters</button>
       </div>
-      <div id="lib-table" class="table-space"><div class="empty-state">Loading ${title}…</div></div>
+      <div id="lib-table" class="library-results"><div class="empty-state">Loading ${title}…</div></div>
     </div>`;
 
     let offset = 0;
@@ -84,44 +130,33 @@
 
     const renderPage = page => {
       const rows = page.items || [];
-      const table = rows.length ? `<div class="table-wrap stable-library-table"><table>
-        <thead><tr><th>Library</th><th>Title</th><th>Type</th><th>Group</th><th>NFO</th><th>NFO Source</th><th>Result</th><th>Release</th><th>Manage</th></tr></thead>
-        <tbody>${rows.map(r => `<tr>
-          <td>${esc(r.configured_library || 'Legacy')}</td>
-          <td><strong>${esc(r.title || r.release_name)}</strong></td>
-          <td>${pill(r.classification)}</td>
-          <td>${esc(r.release_group || 'Unknown')}</td>
-          <td>${r.nfo_present ? '<span class="library-nfo-present">NFO present</span>' : '<span class="library-nfo-missing">NFO missing</span>'}</td>
-          <td>${nfoSourceHtml(r)}</td>
-          <td>${esc(r.last_result || '')}</td>
-          <td class="mono library-release-cell">${esc(r.release_name)}</td>
-          <td><button class="btn secondary item-manage-btn" data-item-id="${Number(r.id)}">Manage NFO</button></td>
-        </tr>`).join('')}</tbody>
-      </table></div>` : '<div class="empty-state">No matching items.</div>';
+      const entries = rows.length
+        ? `<div class="library-entry-list">${rows.map(libraryEntryHtml).join('')}</div>`
+        : '<div class="empty-state">No matching items.</div>';
 
       const pager = `<div class="library-pager">
         <div class="library-page-count">${pageStatus(page)}</div>
         <div class="library-page-controls">
-          <label class="library-page-size">Rows <select id="lib-page-size"><option value="50" ${limit === 50 ? 'selected' : ''}>50</option><option value="100" ${limit === 100 ? 'selected' : ''}>100</option><option value="200" ${limit === 200 ? 'selected' : ''}>200</option></select></label>
-          <button class="btn secondary" id="lib-prev" ${page.offset <= 0 ? 'disabled' : ''}>Previous</button>
+          <label class="library-page-size">Rows <select class="lib-page-size"><option value="50" ${limit === 50 ? 'selected' : ''}>50</option><option value="100" ${limit === 100 ? 'selected' : ''}>100</option><option value="200" ${limit === 200 ? 'selected' : ''}>200</option></select></label>
+          <button class="btn secondary lib-prev" ${page.offset <= 0 ? 'disabled' : ''}>Previous</button>
           <span class="summary-chip">Page ${page.page} / ${page.pages}</span>
-          <button class="btn secondary" id="lib-next" ${page.offset + page.limit >= page.total ? 'disabled' : ''}>Next</button>
+          <button class="btn secondary lib-next" ${page.offset + page.limit >= page.total ? 'disabled' : ''}>Next</button>
         </div>
       </div>`;
 
       const target = document.querySelector('#lib-table');
       if (!target) return;
-      target.innerHTML = `${pager}${table}${pager}`;
+      target.innerHTML = `${pager}${entries}${pager}`;
 
-      target.querySelectorAll('#lib-prev').forEach(button => button.onclick = () => {
+      target.querySelectorAll('.lib-prev').forEach(button => button.onclick = () => {
         offset = Math.max(0, offset - limit);
         loadPage();
       });
-      target.querySelectorAll('#lib-next').forEach(button => button.onclick = () => {
+      target.querySelectorAll('.lib-next').forEach(button => button.onclick = () => {
         offset += limit;
         loadPage();
       });
-      target.querySelectorAll('#lib-page-size').forEach(select => select.onchange = event => {
+      target.querySelectorAll('.lib-page-size').forEach(select => select.onchange = event => {
         limit = Number(event.target.value) || 100;
         offset = 0;
         loadPage();
