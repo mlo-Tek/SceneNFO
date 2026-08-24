@@ -6,7 +6,7 @@ services:
     ports:
       - "8787:8787"
     volumes:
-      - /mnt/cache/appdata/scenenfo:/config
+      - /mnt/cache/appdata/scenenfo/config:/config
       - /mnt/user/data/media:/data/media
     environment:
       - TZ=Europe/Berlin
