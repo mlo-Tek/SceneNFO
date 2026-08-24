@@ -322,9 +322,11 @@ async function startMultiLibraryScan({libraryIds, apply, nfoPolicy}){
         updateMultiProgress();
       }
       if(d.type==='item_error'){
-        summary.errors++;
+        job.index=d.index||job.index;
         liveRows.unshift({...d,library_name:job.name,action:'ERROR'});
+        liveRows=liveRows.slice(0,500);
         renderLiveRows();
+        updateMultiProgress();
       }
       if(d.type==='complete'){
         job.done=true;
