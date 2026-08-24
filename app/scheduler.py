@@ -14,7 +14,10 @@ def refresh_schedule() -> None:
 
     with connection() as conn:
         schedules = conn.execute(
-            "SELECT id,name,cron,enabled,apply_changes,nfo_policy FROM schedules WHERE enabled=1 ORDER BY id"
+            """
+            SELECT id,name,cron,enabled,apply_changes,nfo_policy,scan_scope
+            FROM schedules WHERE enabled=1 ORDER BY id
+            """
         ).fetchall()
         for sched in schedules:
             libraries = conn.execute(
@@ -45,6 +48,7 @@ def refresh_schedule() -> None:
                         sched["nfo_policy"],
                         lib["id"],
                         lib["name"],
+                        sched["scan_scope"] or "incremental",
                     ],
                     id=f"schedule-{sched['id']}-library-{lib['id']}",
                     replace_existing=True,
