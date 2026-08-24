@@ -1,0 +1,13 @@
+services:
+  scenenfo:
+    build: .
+    container_name: scenenfo
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - /mnt/cache/appdata/scenenfo:/config
+      - /mnt/user/data/media:/data/media
+    environment:
+      - TZ=Europe/Berlin
+      - SCENENFO_CONFIG_DIR=/config
