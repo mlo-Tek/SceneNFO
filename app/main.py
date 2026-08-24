@@ -11,10 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from .api import router
 from .db import init_db
 from .groups import seed_p2p_groups, sync_scene_groups
+from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.3"
+VERSION = "0.3.4"
 
 
 @asynccontextmanager
@@ -39,6 +40,7 @@ def app_health():
 
 
 app.include_router(router)
+app.include_router(review_router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
