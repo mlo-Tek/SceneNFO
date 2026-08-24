@@ -25,5 +25,6 @@ DEFAULTS = {
     "schedule_apply": "false",
     "radarr_webhook_enabled": "true",
     "sonarr_webhook_enabled": "true",
-    "import_apply": "true",
+    "import_apply": "false",
+    "import_nfo_policy": "replace_all",
 }
