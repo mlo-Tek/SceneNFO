@@ -129,18 +129,33 @@ def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    # Keep the legacy 'library' column as the media kind (movies/tv) and attach
-    # an optional configured library ID. This upgrades existing databases without
-    # rebuilding the old CHECK-constrained table.
+    # Keep legacy columns and add new fields in place so existing installations
+    # can upgrade without rebuilding their SQLite database.
     if not _has_column(conn, "library_items", "library_id"):
         conn.execute("ALTER TABLE library_items ADD COLUMN library_id INTEGER REFERENCES libraries(id) ON DELETE SET NULL")
+    if not _has_column(conn, "library_items", "file_size"):
+        conn.execute("ALTER TABLE library_items ADD COLUMN file_size INTEGER")
+    if not _has_column(conn, "library_items", "file_mtime_ns"):
+        conn.execute("ALTER TABLE library_items ADD COLUMN file_mtime_ns INTEGER")
+
     if not _has_column(conn, "runs", "library_id"):
         conn.execute("ALTER TABLE runs ADD COLUMN library_id INTEGER REFERENCES libraries(id) ON DELETE SET NULL")
     if not _has_column(conn, "runs", "library_name"):
         conn.execute("ALTER TABLE runs ADD COLUMN library_name TEXT")
     if not _has_column(conn, "runs", "nfo_policy"):
         conn.execute("ALTER TABLE runs ADD COLUMN nfo_policy TEXT")
+    if not _has_column(conn, "runs", "scan_scope"):
+        conn.execute("ALTER TABLE runs ADD COLUMN scan_scope TEXT NOT NULL DEFAULT 'incremental'")
+    if not _has_column(conn, "runs", "skipped"):
+        conn.execute("ALTER TABLE runs ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0")
+    if not _has_column(conn, "runs", "removed"):
+        conn.execute("ALTER TABLE runs ADD COLUMN removed INTEGER NOT NULL DEFAULT 0")
+
+    if not _has_column(conn, "schedules", "scan_scope"):
+        conn.execute("ALTER TABLE schedules ADD COLUMN scan_scope TEXT NOT NULL DEFAULT 'incremental'")
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_library_items_library_id ON library_items(library_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_library_items_fingerprint ON library_items(library_id,file_size,file_mtime_ns)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_library_id ON runs(library_id)")
 
 
