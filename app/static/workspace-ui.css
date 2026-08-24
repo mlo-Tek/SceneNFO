@@ -1,0 +1,193 @@
+/* SceneNFO workspace density/readability pass */
+
+/* Global workspace: spend pixels on content, not chrome. */
+.main{padding:24px 28px 48px}
+.topbar{align-items:center;margin-bottom:16px;min-height:54px}
+.topbar h1{font-size:31px}
+.topbar p{font-size:13px;margin-top:3px}
+.section-card{padding:18px;margin-top:12px}
+.section-head{margin-bottom:12px;align-items:center}
+.section-head h2{font-size:20px}
+.section-head p{font-size:12.5px}
+.card{box-shadow:0 10px 32px rgba(15,23,42,.065)}
+html[data-theme="dark"] .card{box-shadow:0 12px 36px rgba(0,0,0,.24)}
+#content{min-width:0}
+.toolbar{gap:7px}
+.field,.stack-field input,select{min-height:39px;padding:9px 10px}
+.btn{padding:9px 13px}
+
+/* Dashboard: compact overview, quick run stays useful without dominating. */
+.stats-grid{gap:10px}
+.stat{padding:14px 16px}
+.stat-value{font-size:28px;margin-top:4px}
+.quick-run-grid{grid-template-columns:minmax(0,1fr) minmax(255px,310px);gap:16px}
+.quick-run-main .library-check-grid{grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:7px}
+.quick-run-options{gap:9px;padding-left:16px}
+.dashboard-two-col{gap:12px}
+.compact-card{margin-top:12px}
+.metric-row{margin-top:12px;padding-top:11px}
+
+/* Generic check cards: readable, but not oversized. */
+.library-check-grid{gap:7px}
+.library-check{padding:10px 11px;border-radius:11px}
+.library-check strong{font-size:13px}
+.library-check small{font-size:10.5px}
+
+/* Scan workspace: configuration is secondary; live results are the workspace. */
+.scan-layout{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:14px;align-items:start}
+.scan-controls{padding:16px;position:sticky;top:14px;max-height:calc(100vh - 28px);overflow:auto}
+.scan-controls .section-head{margin-bottom:10px}
+.scan-controls .section-head h2{font-size:18px}
+.scan-controls .library-check-grid{grid-template-columns:1fr;gap:6px}
+.scan-controls .library-check{padding:8px 10px}
+.scan-controls .library-check small{max-width:230px}
+.scan-options-grid{gap:8px!important;margin-top:11px}
+.scan-options-grid .stack-field{gap:4px}
+.scan-options-grid .stack-field>span{font-size:10.5px}
+.scan-actions{margin-top:11px;gap:7px}
+.scan-actions .btn{flex:1;padding:9px 10px}
+.scan-controls .run-hint{margin-top:8px;padding:8px 10px;font-size:11px}
+.scan-progress-block{margin-top:12px}
+.scan-status-row{font-size:11px;margin-bottom:6px;line-height:1.35}
+.scan-counts{font-size:11px;margin-top:8px}
+.scan-config-toggle{margin-left:auto;white-space:nowrap}
+.scan-compact-summary{display:none;padding:9px 10px;margin:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--panel-soft);font-size:11px;line-height:1.45;color:var(--muted)}
+.scan-compact-summary strong{color:var(--text)}
+
+.scan-layout.scan-config-collapsed{grid-template-columns:230px minmax(0,1fr)}
+.scan-layout.scan-config-collapsed .scan-controls{padding:13px}
+.scan-layout.scan-config-collapsed .scan-controls>.field-label,
+.scan-layout.scan-config-collapsed .scan-controls>.library-check-grid,
+.scan-layout.scan-config-collapsed .scan-controls>.scan-options-grid,
+.scan-layout.scan-config-collapsed .scan-controls>.run-hint{display:none!important}
+.scan-layout.scan-config-collapsed .scan-controls .section-head p,
+.scan-layout.scan-config-collapsed .scan-controls .section-head>.pill{display:none}
+.scan-layout.scan-config-collapsed .scan-compact-summary{display:block}
+.scan-layout.scan-config-collapsed .scan-actions{display:grid;grid-template-columns:1fr;gap:6px}
+.scan-layout.scan-config-collapsed .scan-progress-block{margin-top:10px}
+
+.live-results-card{padding:16px;min-height:calc(100vh - 116px);min-width:0}
+.live-results-card .section-head{margin-bottom:10px}
+.live-results-card .section-head h2{font-size:22px}
+.live-list{max-height:calc(100vh - 202px);overflow:auto;padding-right:3px}
+.live-result-row{padding:12px 13px;margin-bottom:7px;border:1px solid var(--line);border-radius:12px;background:var(--panel-soft);border-left:3px solid rgba(10,124,255,.30)}
+.live-result-row.scene{border-left-color:rgba(40,180,99,.70)}
+.live-result-row.p2p{border-left-color:rgba(245,158,11,.70)}
+.live-result-row.error{border-left-color:rgba(239,68,68,.75)}
+.live-result-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px}
+.live-result-library{font-size:13px;font-weight:800;color:var(--blue)}
+.live-result-index{font-size:12px;font-weight:700;color:var(--muted)}
+.live-result-action{margin-left:auto;padding:5px 8px;border-radius:999px;background:rgba(127,127,127,.10);font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.015em;white-space:nowrap}
+.live-result-action.write{color:var(--blue);background:rgba(10,124,255,.11)}
+.live-result-action.error{color:var(--red);background:rgba(239,68,68,.11)}
+.live-result-release{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;line-height:1.4;color:var(--text);overflow-wrap:anywhere}
+
+/* Library inventory: reinforce the new card layout. */
+.library-page-card{padding:18px}
+.library-toolbar{margin-bottom:10px}
+.library-results{margin-top:8px}
+.library-entry-list{gap:9px}
+.library-entry{padding:16px 17px}
+.library-entry-title-row{margin-bottom:4px}
+.library-title-link{font-size:20px!important;line-height:1.22!important}
+.library-name-badge{font-size:13px!important}
+.library-entry-actions{margin-top:10px}
+.library-entry-actions .btn{padding:8px 11px}
+.library-entry-meta{gap:10px}
+.library-meta-block{padding:10px 11px}
+.library-meta-label{font-size:10.5px}
+.library-meta-block strong,.library-result{font-size:13px}
+.library-release{font-size:11.5px}
+
+/* Logs/review: selector is small; actual run content gets the viewport. */
+.run-log-shell{gap:10px!important}
+.run-list-card{padding:12px 14px!important;grid-template-columns:minmax(180px,.55fr) minmax(440px,1.8fr)!important}
+.run-list-card .section-head h2{font-size:17px}
+.run-detail-card{padding:16px!important}
+.run-meta{gap:7px;margin:10px 0}
+.run-meta-item{padding:9px 10px}
+.run-meta-item strong{font-size:12.5px}
+.run-summary{margin:8px 0 12px;gap:6px}
+.event-list{max-height:calc(100vh - 330px)!important;min-height:300px}
+.event-row{grid-template-columns:145px 64px 92px minmax(0,1fr);font-size:12px;padding:9px 10px}
+.event-message{font-size:12px;line-height:1.4}
+.review-panel{margin-top:14px;padding-top:14px}
+.candidate-list{max-height:60vh!important;gap:7px}
+.candidate-row{padding:12px 13px}
+.candidate-title{font-size:14.5px}
+.candidate-release{font-size:11px;line-height:1.4}
+
+/* History: card view replaces the old 13-column horizontal table. */
+.history-run-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(390px,1fr));gap:10px}
+.history-run-card{padding:14px 15px;border:1px solid var(--line);border-radius:14px;background:var(--panel-soft);min-width:0}
+.history-run-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:9px}
+.history-run-id{font-size:17px;font-weight:820}
+.history-run-time{font-size:11.5px;color:var(--muted);margin-top:2px}
+.history-run-library{font-size:15px;font-weight:760;margin:7px 0 8px}
+.history-run-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.history-status{padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800;background:rgba(127,127,127,.11)}
+.history-status.completed{color:var(--green);background:rgba(40,180,99,.12)}
+.history-status.failed,.history-status.fatal{color:var(--red);background:rgba(239,68,68,.12)}
+.history-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:9px}
+.history-metric{padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--panel-solid);text-align:center}
+.history-metric span{display:block;color:var(--muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;font-weight:750}
+.history-metric strong{display:block;font-size:15px;margin-top:2px}
+.history-run-actions{display:flex;justify-content:flex-end;margin-top:10px}
+
+/* Groups/tables: slightly larger type, less dead padding, wrap instead of forcing width where possible. */
+.table-wrap{max-height:calc(100vh - 225px)}
+table{font-size:13px}
+thead th{padding:10px 11px;font-size:11.5px}
+tbody td{padding:10px 11px;overflow-wrap:anywhere}
+.mono{font-size:11.5px}
+
+/* Settings: make sections denser and use rows rather than giant vertical blocks. */
+.settings-stack{gap:12px}
+.settings-section{padding:18px}
+.settings-two-col{gap:12px}
+.editor-row{padding:12px 0}
+.editor-main{gap:8px}
+.editor-actions{margin-top:8px}
+.add-panel{margin-top:14px;padding:14px}
+.schedule-head-grid{grid-template-columns:repeat(3,minmax(180px,1fr))!important;gap:8px!important}
+.schedule-libraries-label{margin:11px 0 6px}
+.schedule-editor .library-check-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.appearance-card{padding:16px 18px}
+
+/* Item manager / folder browser use width, not excessive vertical nesting. */
+.item-manager{width:min(940px,94vw)!important;padding:22px!important}
+.item-meta-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+.item-meta{padding:10px 11px!important}
+.item-section{padding-top:14px!important;margin-top:14px!important}
+
+@media(max-width:1500px){
+  .main{padding:22px 22px 44px}
+  .scan-layout{grid-template-columns:minmax(280px,325px) minmax(0,1fr)}
+  .scan-layout.scan-config-collapsed{grid-template-columns:210px minmax(0,1fr)}
+  .history-run-grid{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+}
+
+@media(max-width:1180px){
+  .scan-layout,.scan-layout.scan-config-collapsed{grid-template-columns:1fr}
+  .scan-controls{position:relative;top:auto;max-height:none}
+  .scan-layout.scan-config-collapsed .scan-controls{position:relative}
+  .live-results-card{min-height:62vh}
+  .live-list{max-height:58vh}
+  .schedule-head-grid{grid-template-columns:repeat(2,minmax(180px,1fr))!important}
+  .item-meta-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+@media(max-width:760px){
+  .main{padding:16px 14px 36px}
+  .topbar{align-items:flex-start}.topbar h1{font-size:27px}
+  .section-card{padding:14px}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .quick-run-grid{grid-template-columns:1fr}.quick-run-options{padding-left:0;border-left:0;border-top:1px solid var(--line);padding-top:12px}
+  .scan-options-grid{grid-template-columns:1fr!important}
+  .live-result-action{margin-left:0}
+  .history-run-grid{grid-template-columns:1fr}
+  .history-metrics{grid-template-columns:repeat(2,1fr)}
+  .schedule-head-grid{grid-template-columns:1fr!important}
+  .item-meta-grid{grid-template-columns:1fr!important}
+  .event-row{grid-template-columns:1fr;gap:3px}
+}
