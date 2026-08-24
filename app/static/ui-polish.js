@@ -2,10 +2,11 @@
   const previousFetch = window.fetch.bind(window);
   const inventories = {movies: [], tv: []};
   const itemDetails = new Map();
+  const libraryRenderTokens = {movies: 0, tv: 0};
   let lastBrowserDownload = null;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'
   }[ch]));
 
   const sourceLabel = source => ({
@@ -24,6 +25,66 @@
     }).format(d);
   };
 
+  function activeKind() {
+    const view = document.querySelector('.nav.active')?.dataset?.view;
+    return view === 'movies' || view === 'tv' ? view : null;
+  }
+
+  function sourceCellHtml(item) {
+    const installed = item.nfo_source ? sourceLabel(item.nfo_source) : '';
+    const browser = item.browser_nfo_source ? sourceLabel(item.browser_nfo_source) : '';
+    const installedText = installed
+      ? `<span class="source-installed">Downloaded from ${esc(installed)}</span>`
+      : item.nfo_present
+        ? '<span class="source-unknown">Source unknown</span>'
+        : '<span class="source-none">No NFO installed</span>';
+    const browserText = browser
+      ? `<span class="source-browser">Browser only · Downloaded from ${esc(browser)}${item.browser_nfo_downloaded_at ? ` · ${esc(localTime(item.browser_nfo_downloaded_at))}` : ''}</span>`
+      : '';
+    return `<div class="nfo-source-stack">${installedText}${browserText}</div>`;
+  }
+
+  function enhanceLibrarySources(kind) {
+    if (activeKind() !== kind) return false;
+    const table = document.querySelector('#lib-table table');
+    if (!table) return false;
+    const rows = inventories[kind] || [];
+    const trs = table.querySelectorAll('tbody tr');
+    if (trs.length !== rows.length) return false;
+
+    const headers = table.querySelectorAll('thead th');
+    if (headers[5] && headers[5].textContent !== 'NFO Source') headers[5].textContent = 'NFO Source';
+
+    for (let index = 0; index < trs.length; index += 1) {
+      const item = rows[index];
+      const cell = trs[index].children[5];
+      if (!item || !cell) continue;
+      const key = [
+        item.nfo_source || '',
+        item.browser_nfo_source || '',
+        item.browser_nfo_downloaded_at || '',
+        Number(item.nfo_present || 0),
+      ].join('|');
+      if (cell.dataset.scenenfoSourceKey === key) continue;
+      const html = sourceCellHtml(item);
+      if (cell.innerHTML !== html) cell.innerHTML = html;
+      cell.dataset.scenenfoSourceKey = key;
+    }
+    return true;
+  }
+
+  function scheduleLibrarySourceEnhancement(kind) {
+    const token = ++libraryRenderTokens[kind];
+    let attempt = 0;
+    const run = () => {
+      if (token !== libraryRenderTokens[kind] || activeKind() !== kind) return;
+      if (enhanceLibrarySources(kind)) return;
+      attempt += 1;
+      if (attempt < 12) setTimeout(() => requestAnimationFrame(run), attempt < 4 ? 0 : 25);
+    };
+    requestAnimationFrame(run);
+  }
+
   window.fetch = async (input, init={}) => {
     const response = await previousFetch(input, init);
     const raw = typeof input === 'string' ? input : input?.url || '';
@@ -33,8 +94,9 @@
     const libraryMatch = url.pathname.match(/^\/api\/library\/(movies|tv)$/);
     if (libraryMatch && method === 'GET' && response.ok) {
       response.clone().json().then(rows => {
-        inventories[libraryMatch[1]] = rows || [];
-        setTimeout(enhanceLibrarySources, 0);
+        const kind = libraryMatch[1];
+        inventories[kind] = rows || [];
+        scheduleLibrarySourceEnhancement(kind);
       }).catch(() => {});
     }
 
@@ -61,7 +123,8 @@
       setTimeout(() => {
         const status = document.querySelector('#item-operation-status');
         if (status) {
-          status.textContent = `Browser download complete · Downloaded from ${source} · No files were written to or changed in the media folder.`;
+          const text = `Browser download complete · Downloaded from ${source} · No files were written to or changed in the media folder.`;
+          if (status.textContent !== text) status.textContent = text;
           status.className = 'item-operation-status ok';
         }
         enhanceItemManager();
@@ -72,19 +135,24 @@
     return response;
   };
 
-  function renameTvEverywhere(root=document.body) {
+  function renameTvIn(root) {
     if (!root) return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-    for (const node of nodes) {
+    const rewrite = node => {
       const text = node.nodeValue || '';
-      const next = text
+      if (!text.includes('TV Shows') && !text.includes('TV Episodes') && !text.includes('TV episode inventory')) return;
+      node.nodeValue = text
         .replaceAll('TV Shows', 'TV')
         .replaceAll('TV Episodes', 'TV')
         .replaceAll('TV episode inventory', 'TV library inventory');
-      if (next !== text) node.nodeValue = next;
+    };
+
+    if (root.nodeType === Node.TEXT_NODE) {
+      rewrite(root);
+      return;
     }
+    if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) rewrite(walker.currentNode);
   }
 
   function setupSidebarToggle() {
@@ -107,9 +175,11 @@
 
     const apply = collapsed => {
       shell.classList.toggle('sidebar-collapsed', collapsed);
-      button.textContent = collapsed ? '›' : '‹';
-      button.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-      button.setAttribute('aria-label', button.title);
+      const symbol = collapsed ? '›' : '‹';
+      const title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      if (button.textContent !== symbol) button.textContent = symbol;
+      if (button.title !== title) button.title = title;
+      button.setAttribute('aria-label', title);
       localStorage.setItem('scenenfo-sidebar-collapsed', collapsed ? '1' : '0');
     };
 
@@ -120,49 +190,20 @@
     apply(localStorage.getItem('scenenfo-sidebar-collapsed') === '1');
   }
 
-  function activeKind() {
-    const view = document.querySelector('.nav.active')?.dataset?.view;
-    return view === 'movies' || view === 'tv' ? view : null;
+  function enhanceCandidateStateElement(state) {
+    if (!state || state.dataset.scenenfoNfoState === '1') return;
+    const text = state.textContent.trim().toLowerCase();
+    if (!text.includes('nfo present') && !text.includes('nfo missing')) return;
+    state.dataset.scenenfoNfoState = '1';
+    state.classList.add('candidate-nfo-state');
+    state.classList.toggle('nfo-present', text.includes('present'));
+    state.classList.toggle('nfo-missing', text.includes('missing'));
   }
 
-  function sourceCellHtml(item) {
-    const installed = item.nfo_source ? sourceLabel(item.nfo_source) : '';
-    const browser = item.browser_nfo_source ? sourceLabel(item.browser_nfo_source) : '';
-    const installedText = installed
-      ? `<span class="source-installed">Downloaded from ${esc(installed)}</span>`
-      : item.nfo_present
-        ? '<span class="source-unknown">Source unknown</span>'
-        : '<span class="source-none">No NFO installed</span>';
-    const browserText = browser
-      ? `<span class="source-browser">Browser only · Downloaded from ${esc(browser)}${item.browser_nfo_downloaded_at ? ` · ${esc(localTime(item.browser_nfo_downloaded_at))}` : ''}</span>`
-      : '';
-    return `<div class="nfo-source-stack">${installedText}${browserText}</div>`;
-  }
-
-  function enhanceLibrarySources() {
-    const kind = activeKind();
-    const table = document.querySelector('#lib-table table');
-    if (!kind || !table) return;
-    const rows = inventories[kind] || [];
-    const trs = [...table.querySelectorAll('tbody tr')];
-    if (!rows.length || rows.length !== trs.length) return;
-
-    const headers = [...table.querySelectorAll('thead th')];
-    if (headers[5]) headers[5].textContent = 'NFO Source';
-
-    trs.forEach((tr, index) => {
-      const cells = tr.querySelectorAll('td');
-      if (cells[5] && rows[index]) cells[5].innerHTML = sourceCellHtml(rows[index]);
-    });
-  }
-
-  function enhanceCandidateNfoStates() {
-    document.querySelectorAll('.candidate-row > .candidate-action:last-child').forEach(state => {
-      const text = state.textContent.trim().toLowerCase();
-      state.classList.add('candidate-nfo-state');
-      state.classList.toggle('nfo-present', text.includes('present'));
-      state.classList.toggle('nfo-missing', text.includes('missing'));
-    });
+  function enhanceCandidateStatesIn(root) {
+    if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
+    if (root.matches?.('.candidate-row > .candidate-action:last-child')) enhanceCandidateStateElement(root);
+    root.querySelectorAll?.('.candidate-row > .candidate-action:last-child').forEach(enhanceCandidateStateElement);
   }
 
   function enhanceItemManager() {
@@ -171,7 +212,7 @@
 
     const download = panel.querySelector('.item-download-source');
     if (download) {
-      download.textContent = 'Download NFO to browser';
+      if (download.textContent !== 'Download NFO to browser') download.textContent = 'Download NFO to browser';
       download.title = 'Downloads a copy to this browser only. The media folder is not changed.';
     }
 
@@ -191,12 +232,14 @@
       return label === 'NFO source' || label === 'NFO Source' || label === 'Media-folder NFO source';
     });
     if (sourceMeta) {
-      sourceMeta.querySelector('span').textContent = 'NFO Source';
+      const label = sourceMeta.querySelector('span');
+      if (label && label.textContent !== 'NFO Source') label.textContent = 'NFO Source';
       const strong = sourceMeta.querySelector('strong');
       if (strong && item) {
-        strong.textContent = item.nfo_source
+        const next = item.nfo_source
           ? downloadedFrom(item.nfo_source)
           : item.nfo_present ? 'Source unknown' : 'No NFO installed';
+        if (strong.textContent !== next) strong.textContent = next;
       }
     }
 
@@ -207,9 +250,12 @@
       metaGrid.appendChild(meta);
     } else if (item && metaGrid) {
       const strong = metaGrid.querySelector('.browser-source-meta strong');
-      if (strong) strong.textContent = item.browser_nfo_source
-        ? `${downloadedFrom(item.browser_nfo_source)}${item.browser_nfo_downloaded_at ? ` · ${localTime(item.browser_nfo_downloaded_at)}` : ''}`
-        : 'None';
+      if (strong) {
+        const next = item.browser_nfo_source
+          ? `${downloadedFrom(item.browser_nfo_source)}${item.browser_nfo_downloaded_at ? ` · ${localTime(item.browser_nfo_downloaded_at)}` : ''}`
+          : 'None';
+        if (strong.textContent !== next) strong.textContent = next;
+      }
     }
 
     if (lastBrowserDownload && lastBrowserDownload.itemId === itemId) {
@@ -220,16 +266,28 @@
     }
   }
 
-  function enhanceAll() {
-    setupSidebarToggle();
-    renameTvEverywhere();
-    enhanceLibrarySources();
-    enhanceCandidateNfoStates();
-    enhanceItemManager();
+  function handleAddedNodes(mutations) {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        renameTvIn(node);
+        enhanceCandidateStatesIn(node);
+      }
+    }
   }
 
-  const observer = new MutationObserver(() => queueMicrotask(enhanceAll));
-  observer.observe(document.documentElement, {childList:true, subtree:true});
-  document.addEventListener('DOMContentLoaded', enhanceAll);
-  setTimeout(enhanceAll, 0);
+  setupSidebarToggle();
+  renameTvIn(document.body);
+  enhanceCandidateStatesIn(document.body);
+
+  const contentRoot = document.querySelector('#content');
+  if (contentRoot) {
+    const observer = new MutationObserver(handleAddedNodes);
+    observer.observe(contentRoot, {childList:true, subtree:true});
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setupSidebarToggle();
+    renameTvIn(document.body);
+    enhanceCandidateStatesIn(document.body);
+  });
 })();
