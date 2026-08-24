@@ -34,6 +34,8 @@ class ScanManager:
         trigger: str = "manual",
         apply: bool = False,
         nfo_policy: str = "replace_all",
+        library_id: int | None = None,
+        library_name: str | None = None,
     ) -> str:
         if nfo_policy not in NFO_POLICIES:
             nfo_policy = "replace_all"
@@ -45,8 +47,12 @@ class ScanManager:
             "stop": False,
             "run_id": None,
             "nfo_policy": nfo_policy,
+            "library_id": library_id,
+            "library_name": library_name,
         }
-        asyncio.create_task(self._run(job_id, library, path, trigger, apply, nfo_policy))
+        asyncio.create_task(
+            self._run(job_id, library, path, trigger, apply, nfo_policy, library_id, library_name)
+        )
         return job_id
 
     async def events(self, job_id: str):
@@ -77,25 +83,35 @@ class ScanManager:
         trigger: str,
         apply: bool,
         nfo_policy: str,
+        library_id: int | None,
+        library_name: str | None,
     ):
         job = self.jobs[job_id]
         job["status"] = "running"
         root = Path(path or get_setting("movies_path" if library == "movies" else "tv_path"))
+        display_name = library_name or ("Movies" if library == "movies" else "TV Shows")
         mode = "apply" if apply else "dry-run"
+
         with connection() as conn:
             cur = conn.execute(
-                "INSERT INTO runs(kind,library,mode,trigger,status,started_at) VALUES('scan',?,?,?,?,?)",
-                (library, mode, trigger, "running", utcnow()),
+                """
+                INSERT INTO runs(kind,library,library_id,library_name,nfo_policy,mode,trigger,status,started_at)
+                VALUES('scan',?,?,?,?,?,?,?,?)
+                """,
+                (library, library_id, display_name, nfo_policy, mode, trigger, "running", utcnow()),
             )
             run_id = cur.lastrowid
         job["run_id"] = run_id
+
         await self._emit(
             job_id,
             run_id,
             {
                 "type": "start",
-                "message": f"Scanning {library}",
+                "message": f"Scanning {display_name}",
                 "library": library,
+                "library_id": library_id,
+                "library_name": display_name,
                 "path": str(root),
                 "mode": mode,
                 "nfo_policy": nfo_policy,
@@ -113,7 +129,11 @@ class ScanManager:
                 get_setting("crowdnfo_base_url", "https://crowdnfo.net"),
                 get_setting("crowdnfo_api_key", ""),
             )
-            priority = [x.strip().lower() for x in get_setting("source_priority", "srrdb,predb,crowdnfo").split(",") if x.strip()]
+            priority = [
+                x.strip().lower()
+                for x in get_setting("source_priority", "srrdb,predb,crowdnfo").split(",")
+                if x.strip()
+            ]
 
             scanned = scene = p2p = errors = created = replaced = 0
 
@@ -121,7 +141,12 @@ class ScanManager:
                 if job["stop"]:
                     job["status"] = "cancelled"
                     self._finish_run(run_id, "cancelled", scanned, scene, p2p, created, replaced, errors)
-                    await self._emit(job_id, run_id, {"type": "cancelled", "message": "Scan cancelled", "scanned": scanned, "total": total}, "WARNING")
+                    await self._emit(
+                        job_id,
+                        run_id,
+                        {"type": "cancelled", "message": "Scan cancelled", "scanned": scanned, "total": total},
+                        "WARNING",
+                    )
                     return
 
                 release = media.name[:-4]  # intentionally only strip .mkv
@@ -178,8 +203,7 @@ class ScanManager:
 
                             if apply:
                                 raw = await self._download_nfo(
-                                    selected["url"],
-                                    crowd.api_key if source_name == "crowdnfo" else "",
+                                    selected["url"], crowd.api_key if source_name == "crowdnfo" else ""
                                 )
                                 self._validate_nfo(raw)
                                 digest_after = hashlib.sha256(raw).hexdigest()
@@ -192,7 +216,11 @@ class ScanManager:
 
                                 if replace_candidates:
                                     replaced += 1
-                                    action = "REPLACED_IDENTICAL" if digest_before and digest_before == digest_after else "REPLACED_CHANGED"
+                                    action = (
+                                        "REPLACED_IDENTICAL"
+                                        if digest_before and digest_before == digest_after
+                                        else "REPLACED_CHANGED"
+                                    )
                                 else:
                                     created += 1
                                     action = "CREATED"
@@ -203,11 +231,17 @@ class ScanManager:
 
                     scanned += 1
                     nfos_after = self._all_nfos(media.parent)
-                    nfo_path = str(target if target and target.exists() else (replace_candidates[0] if replace_candidates else (nfos_after[0] if nfos_after else ""))) or None
+                    nfo_path = str(
+                        target
+                        if target and target.exists()
+                        else (replace_candidates[0] if replace_candidates else (nfos_after[0] if nfos_after else ""))
+                    ) or None
                     nfo_present = bool(replace_candidates or nfos_after)
 
                     with connection() as conn:
-                        previous = conn.execute("SELECT nfo_source FROM library_items WHERE media_path=?", (str(media),)).fetchone()
+                        previous = conn.execute(
+                            "SELECT nfo_source FROM library_items WHERE media_path=?", (str(media),)
+                        ).fetchone()
                         recorded_source = (
                             source_name
                             if apply and action in {"CREATED", "REPLACED_IDENTICAL", "REPLACED_CHANGED"}
@@ -215,15 +249,33 @@ class ScanManager:
                         )
                         conn.execute(
                             """
-                            INSERT INTO library_items(library,media_path,title,release_name,classification,release_group,predb_id,nfo_path,nfo_source,nfo_present,last_result,last_checked_at)
-                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                            INSERT INTO library_items(
+                              library,library_id,media_path,title,release_name,classification,release_group,
+                              predb_id,nfo_path,nfo_source,nfo_present,last_result,last_checked_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                             ON CONFLICT(media_path) DO UPDATE SET
-                              library=excluded.library,title=excluded.title,release_name=excluded.release_name,
-                              classification=excluded.classification,release_group=excluded.release_group,predb_id=excluded.predb_id,
-                              nfo_path=excluded.nfo_path,nfo_source=excluded.nfo_source,nfo_present=excluded.nfo_present,
-                              last_result=excluded.last_result,last_checked_at=excluded.last_checked_at
+                              library=excluded.library,library_id=excluded.library_id,title=excluded.title,
+                              release_name=excluded.release_name,classification=excluded.classification,
+                              release_group=excluded.release_group,predb_id=excluded.predb_id,
+                              nfo_path=excluded.nfo_path,nfo_source=excluded.nfo_source,
+                              nfo_present=excluded.nfo_present,last_result=excluded.last_result,
+                              last_checked_at=excluded.last_checked_at
                             """,
-                            (library, str(media), media.parent.name, release, classification, group, pre_id, nfo_path, recorded_source, int(nfo_present), action, utcnow()),
+                            (
+                                library,
+                                library_id,
+                                str(media),
+                                media.parent.name,
+                                release,
+                                classification,
+                                group,
+                                pre_id,
+                                nfo_path,
+                                recorded_source,
+                                int(nfo_present),
+                                action,
+                                utcnow(),
+                            ),
                         )
 
                     await self._emit(
@@ -247,12 +299,25 @@ class ScanManager:
                             "action": action,
                             "target": str(target) if target else None,
                             "nfo_policy": nfo_policy,
+                            "library_id": library_id,
+                            "library_name": display_name,
                         },
                     )
                 except Exception as exc:
                     errors += 1
                     scanned += 1
-                    await self._emit(job_id, run_id, {"type": "item_error", "message": str(exc), "index": idx, "total": total, "media_path": str(media)}, "ERROR")
+                    await self._emit(
+                        job_id,
+                        run_id,
+                        {
+                            "type": "item_error",
+                            "message": str(exc),
+                            "index": idx,
+                            "total": total,
+                            "media_path": str(media),
+                        },
+                        "ERROR",
+                    )
 
             self._finish_run(run_id, "completed", scanned, scene, p2p, created, replaced, errors)
             job["status"] = "completed"
@@ -270,12 +335,17 @@ class ScanManager:
                     "errors": errors,
                     "total": total,
                     "nfo_policy": nfo_policy,
+                    "library_id": library_id,
+                    "library_name": display_name,
                 },
             )
         except Exception as exc:
             job["status"] = "fatal"
             with connection() as conn:
-                conn.execute("UPDATE runs SET status='failed',finished_at=?,errors=errors+1 WHERE id=?", (utcnow(), run_id))
+                conn.execute(
+                    "UPDATE runs SET status='failed',finished_at=?,errors=errors+1 WHERE id=?",
+                    (utcnow(), run_id),
+                )
             await self._emit(job_id, run_id, {"type": "fatal", "message": str(exc)}, "ERROR")
 
     @staticmethod
@@ -283,6 +353,8 @@ class ScanManager:
         result = []
         if root.is_file() and root.suffix.lower() == ".mkv":
             return [root]
+        if not root.exists():
+            raise FileNotFoundError(f"Library path does not exist: {root}")
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames.sort(key=str.casefold)
             for name in sorted(filenames, key=str.casefold):
@@ -292,7 +364,10 @@ class ScanManager:
 
     @staticmethod
     def _all_nfos(folder: Path) -> list[Path]:
-        return sorted([p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".nfo"], key=lambda p: p.name.casefold())
+        return sorted(
+            [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".nfo"],
+            key=lambda p: p.name.casefold(),
+        )
 
     @staticmethod
     def _p2p_group(release: str) -> str | None:
@@ -307,7 +382,14 @@ class ScanManager:
         s, e1, e2 = int(m.group(1)), int(m.group(2)), m.group(3)
         return f"S{s:02d}E{e1:02d}" + (f"E{int(e2):02d}" if e2 else "")
 
-    def _replace_candidates(self, media: Path, release: str, group: str, source_names: list[str | None], library: str) -> list[Path]:
+    def _replace_candidates(
+        self,
+        media: Path,
+        release: str,
+        group: str,
+        source_names: list[str | None],
+        library: str,
+    ) -> list[Path]:
         wanted = {f"{release}.nfo".casefold()}
         wanted.update(Path(x).name.casefold() for x in source_names if x)
         media_ep = self._episode_key(media.name)
@@ -368,7 +450,16 @@ class ScanManager:
             return None
 
     @staticmethod
-    def _finish_run(run_id: int, status: str, scanned: int, scene: int, p2p: int, created: int, replaced: int, errors: int):
+    def _finish_run(
+        run_id: int,
+        status: str,
+        scanned: int,
+        scene: int,
+        p2p: int,
+        created: int,
+        replaced: int,
+        errors: int,
+    ):
         with connection() as conn:
             conn.execute(
                 "UPDATE runs SET status=?,finished_at=?,scanned=?,scene=?,p2p=?,created=?,replaced=?,errors=? WHERE id=?",
