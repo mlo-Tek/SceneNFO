@@ -99,6 +99,14 @@ def _named_nfo(item: dict, media: Path, name: str) -> Path:
     return target
 
 
+def _source_label(source: str) -> str:
+    return {
+        "srrdb": "srrDB",
+        "predb": "PreDB.club",
+        "crowdnfo": "crowdNFO",
+    }.get(source, source)
+
+
 async def _fresh_nfo(item: dict) -> tuple[bytes, str, str]:
     release = item["release_name"]
     predb = PreDBClient(get_setting("predb_base_url", "https://predb.club"))
@@ -222,9 +230,26 @@ async def download_fresh_source_nfo(item_id: int):
     item = _item_or_404(item_id)
     _media_or_409(item)
     raw, filename, source = await _fresh_nfo(item)
+
+    # This endpoint only sends a copy to the browser; it never writes into the
+    # media folder. Persist that fact separately from nfo_source so the library
+    # can show where the browser copy came from without implying it is installed.
+    downloaded_at = utcnow()
+    with connection() as conn:
+        conn.execute(
+            """
+            UPDATE library_items
+            SET browser_nfo_source=?,browser_nfo_downloaded_at=?
+            WHERE id=?
+            """,
+            (source, downloaded_at, item_id),
+        )
+
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "X-SceneNFO-Source": source,
+        "X-SceneNFO-Source-Label": _source_label(source),
+        "X-SceneNFO-Storage": "browser-only",
     }
     return Response(content=raw, media_type="text/plain; charset=windows-1252", headers=headers)
 
