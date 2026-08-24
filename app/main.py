@@ -14,6 +14,7 @@ from .groups import seed_p2p_groups, sync_scene_groups
 from .scheduler import refresh_schedule, scheduler
 
 STATIC = Path(__file__).parent / "static"
+VERSION = "0.3.0"
 
 
 @asynccontextmanager
@@ -29,7 +30,14 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="SceneNFO", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="SceneNFO", version=VERSION, lifespan=lifespan)
+
+
+@app.get("/api/health", include_in_schema=False)
+def app_health():
+    return {"ok": True, "version": VERSION}
+
+
 app.include_router(router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
