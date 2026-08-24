@@ -55,8 +55,8 @@ Default library paths inside the container:
 ## Run with Docker Compose
 
 ```bash
-git clone <PRIVATE_REPO_URL>
-cd scenenfo
+git clone https://github.com/mlo-Tek/SceneNFO.git
+cd SceneNFO
 docker compose up -d --build
 ```
 
