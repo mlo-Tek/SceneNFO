@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="SceneNFO", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="SceneNFO", version="0.3.0", lifespan=lifespan)
 app.include_router(router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
