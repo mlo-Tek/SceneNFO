@@ -1,6 +1,7 @@
 (() => {
   const nativeFetch = window.fetch.bind(window);
   const inventories = {movies: [], tv: []};
+  const renderTokens = {movies: 0, tv: 0};
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
   const apiJson = async (url, opts={}) => {
@@ -16,33 +17,18 @@
     return response.status === 204 ? null : response.json();
   };
 
-  window.fetch = async (input, init={}) => {
-    const response = await nativeFetch(input, init);
-    const raw = typeof input === 'string' ? input : input?.url || '';
-    const url = new URL(raw, location.origin);
-    const match = url.pathname.match(/^\/api\/library\/(movies|tv)$/);
-    const method = String(init.method || 'GET').toUpperCase();
-    if (match && method === 'GET' && response.ok) {
-      try {
-        inventories[match[1]] = await response.clone().json();
-        setTimeout(enhanceLibraryTable, 0);
-      } catch {}
-    }
-    return response;
-  };
-
   function activeKind(){
     const active = document.querySelector('.nav.active')?.dataset?.view;
     return active === 'movies' || active === 'tv' ? active : null;
   }
 
-  function enhanceLibraryTable(){
-    const kind = activeKind();
+  function enhanceLibraryTable(kind=activeKind()){
+    if (!kind || activeKind() !== kind) return false;
     const table = document.querySelector('#lib-table table');
-    if (!kind || !table) return;
+    if (!table) return false;
     const rows = inventories[kind] || [];
-    const trs = [...table.querySelectorAll('tbody tr')];
-    if (!rows.length || trs.length !== rows.length) return;
+    const trs = table.querySelectorAll('tbody tr');
+    if (trs.length !== rows.length) return false;
 
     const head = table.querySelector('thead tr');
     if (head && !head.querySelector('.item-manage-head')) {
@@ -52,15 +38,45 @@
       head.appendChild(th);
     }
 
-    trs.forEach((tr, index) => {
+    for (let index = 0; index < trs.length; index += 1) {
+      const tr = trs[index];
       const item = rows[index];
-      if (!item || tr.querySelector('.item-manage-cell')) return;
+      if (!item || tr.querySelector('.item-manage-cell')) continue;
       const td = document.createElement('td');
       td.className = 'item-manage-cell';
       td.innerHTML = `<button class="btn secondary item-manage-btn" data-item-id="${Number(item.id)}">Manage NFO</button>`;
       tr.appendChild(td);
-    });
+    }
+    return true;
   }
+
+  function scheduleEnhanceLibraryTable(kind){
+    const token = ++renderTokens[kind];
+    let attempt = 0;
+    const run = () => {
+      if (token !== renderTokens[kind] || activeKind() !== kind) return;
+      if (enhanceLibraryTable(kind)) return;
+      attempt += 1;
+      if (attempt < 12) setTimeout(() => requestAnimationFrame(run), attempt < 4 ? 0 : 25);
+    };
+    requestAnimationFrame(run);
+  }
+
+  window.fetch = async (input, init={}) => {
+    const response = await nativeFetch(input, init);
+    const raw = typeof input === 'string' ? input : input?.url || '';
+    const url = new URL(raw, location.origin);
+    const match = url.pathname.match(/^\/api\/library\/(movies|tv)$/);
+    const method = String(init.method || 'GET').toUpperCase();
+    if (match && method === 'GET' && response.ok) {
+      try {
+        const kind = match[1];
+        inventories[kind] = await response.clone().json();
+        scheduleEnhanceLibraryTable(kind);
+      } catch {}
+    }
+    return response;
+  };
 
   function badge(text, cls='summary-chip'){
     return `<span class="${cls}">${esc(text)}</span>`;
@@ -268,7 +284,4 @@
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') closeManager();
   });
-
-  const observer = new MutationObserver(() => enhanceLibraryTable());
-  observer.observe(document.documentElement, {childList:true, subtree:true});
 })();
