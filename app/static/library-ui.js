@@ -49,9 +49,7 @@
 
     return `<article class="library-entry ${classification}">
       <div class="library-entry-main">
-        <div class="library-entry-title-row">
-          <button class="library-title-link item-folder-btn" data-item-id="${Number(item.id)}" title="Open media folder in SceneNFO">${esc(title)}</button>
-        </div>
+        <button class="library-title-link item-folder-btn" data-item-id="${Number(item.id)}" title="Open media folder in SceneNFO">${esc(title)}</button>
         <div class="library-entry-context">
           <span class="library-name-badge">${esc(library)}</span>
           <span class="library-release mono" title="${esc(item.release_name)}">${esc(item.release_name)}</span>
@@ -83,6 +81,22 @@
     </article>`;
   };
 
+  const sortOptions = () => `
+    <option value="title:asc">Title · A → Z</option>
+    <option value="title:desc">Title · Z → A</option>
+    <option value="group:asc">Release group · A → Z</option>
+    <option value="group:desc">Release group · Z → A</option>
+    <option value="classification:desc">Type · Scene first</option>
+    <option value="classification:asc">Type · P2P first</option>
+    <option value="nfo:asc">NFO · Missing first</option>
+    <option value="nfo:desc">NFO · Present first</option>
+    <option value="result:asc">Last result · A → Z</option>
+    <option value="result:desc">Last result · Z → A</option>
+    <option value="library:asc">Library · A → Z</option>
+    <option value="library:desc">Library · Z → A</option>
+    <option value="release:asc">Release name · A → Z</option>
+    <option value="release:desc">Release name · Z → A</option>`;
+
   renderLibrary = async function(kind) {
     const title = kind === 'movies' ? 'Movies' : 'TV';
     const noun = kind === 'movies' ? 'movie' : 'TV';
@@ -97,14 +111,15 @@
 
     content.innerHTML = `<div class="card section-card library-page-card">
       <div class="section-head">
-        <div><h2>${title}</h2><p>Filter and manage the SceneNFO inventory. Click a title to browse its media folder.</p></div>
+        <div><h2>${title}</h2><p>Filter, sort and manage the SceneNFO inventory. Click a title to browse its media folder.</p></div>
       </div>
       <div class="toolbar library-toolbar">
         <select id="lib-config"><option value="">All ${noun} libraries</option>${libs.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
         <input id="lib-q" class="field grow" placeholder="Search title, release or group…">
         <select id="lib-class"><option value="">All types</option><option value="scene">Scene</option><option value="p2p">P2P</option></select>
         <select id="lib-nfo"><option value="">All NFO</option><option value="present">NFO present</option><option value="missing">NFO missing</option></select>
-        <button class="btn secondary" id="lib-filter">Apply filters</button>
+        <select id="lib-sort" title="Sort the complete matching library">${sortOptions()}</select>
+        <button class="btn secondary" id="lib-filter">Apply</button>
       </div>
       <div id="lib-table" class="library-results"><div class="empty-state">Loading ${title}…</div></div>
     </div>`;
@@ -119,10 +134,13 @@
       const classification = document.querySelector('#lib-class')?.value;
       const nfo = document.querySelector('#lib-nfo')?.value;
       const libraryId = document.querySelector('#lib-config')?.value;
+      const [sort, direction] = String(document.querySelector('#lib-sort')?.value || 'title:asc').split(':');
       if (q) params.set('q', q);
       if (classification) params.set('classification', classification);
       if (nfo) params.set('nfo', nfo);
       if (libraryId) params.set('library_id', libraryId);
+      params.set('sort', sort || 'title');
+      params.set('direction', direction || 'asc');
       params.set('limit', String(limit));
       params.set('offset', String(offset));
       return params;
@@ -181,20 +199,19 @@
       }
     };
 
-    document.querySelector('#lib-filter').onclick = () => {
+    const resetAndLoad = () => {
       offset = 0;
       loadPage();
     };
+
+    document.querySelector('#lib-filter').onclick = resetAndLoad;
     document.querySelector('#lib-q').addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        offset = 0;
-        loadPage();
-      }
+      if (event.key === 'Enter') resetAndLoad();
     });
-    document.querySelector('#lib-config').addEventListener('change', () => {
-      offset = 0;
-      loadPage();
-    });
+    document.querySelector('#lib-config').addEventListener('change', resetAndLoad);
+    document.querySelector('#lib-class').addEventListener('change', resetAndLoad);
+    document.querySelector('#lib-nfo').addEventListener('change', resetAndLoad);
+    document.querySelector('#lib-sort').addEventListener('change', resetAndLoad);
 
     await loadPage();
   };
