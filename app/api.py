@@ -21,6 +21,7 @@ class ScanRequest(BaseModel):
     library: str
     path: str | None = None
     apply: bool = False
+    nfo_policy: str = "replace_all"
 
 
 class SettingsUpdate(BaseModel):
@@ -47,7 +48,9 @@ def dashboard():
 def start_scan(body: ScanRequest):
     if body.library not in {"movies", "tv"}:
         raise HTTPException(400, "library must be movies or tv")
-    job_id = scan_manager.create(body.library, body.path, "manual", body.apply)
+    if body.nfo_policy not in {"replace_all", "missing_only"}:
+        raise HTTPException(400, "nfo_policy must be replace_all or missing_only")
+    job_id = scan_manager.create(body.library, body.path, "manual", body.apply, body.nfo_policy)
     return {"job_id": job_id}
 
 
@@ -164,7 +167,8 @@ async def radarr_webhook(request: Request):
     movie = payload.get("movie") or {}
     path = movie.get("folderPath") or movie.get("path")
     apply = get_setting("import_apply", "true").lower() == "true"
-    job = scan_manager.create("movies", path, "radarr-import", apply) if path else scan_manager.create("movies", None, "radarr-import", apply)
+    policy = get_setting("import_nfo_policy", "replace_all")
+    job = scan_manager.create("movies", path, "radarr-import", apply, policy) if path else scan_manager.create("movies", None, "radarr-import", apply, policy)
     return {"accepted": True, "job_id": job}
 
 
@@ -176,6 +180,6 @@ async def sonarr_webhook(request: Request):
     series = payload.get("series") or {}
     path = series.get("path")
     apply = get_setting("import_apply", "true").lower() == "true"
-    # On Import Complete / Season-Pack: process the affected series path after Sonarr finished importing.
-    job = scan_manager.create("tv", path, "sonarr-import-complete", apply) if path else scan_manager.create("tv", None, "sonarr-import-complete", apply)
+    policy = get_setting("import_nfo_policy", "replace_all")
+    job = scan_manager.create("tv", path, "sonarr-import-complete", apply, policy) if path else scan_manager.create("tv", None, "sonarr-import-complete", apply, policy)
     return {"accepted": True, "job_id": job}
