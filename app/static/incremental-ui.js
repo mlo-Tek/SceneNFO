@@ -19,8 +19,8 @@
     if (!raw) return input;
     const u = new URL(raw, location.origin);
 
-    // Old cached app.js used library_id= for the "All libraries" option. FastAPI
-    // correctly rejected that empty string as an integer. Omit empty filters.
+    // Older cached app.js versions sent library_id= for the "All libraries"
+    // option. Empty optional filters are omitted instead of being sent.
     for (const key of ['library_id', 'classification', 'nfo', 'group', 'q']) {
       if (u.searchParams.get(key) === '') u.searchParams.delete(key);
     }
@@ -120,7 +120,9 @@
     label.innerHTML = `<span>Scan scope</span><select ${id ? `id="${id}"` : ''} ${cls ? `class="${cls}"` : ''}>${scopeOptions(selected)}</select>`;
     const select = label.querySelector('select');
     select?.addEventListener('change', () => {
-      if (id === 'dash-scope' || id === 'scan-scope') window.__scenenfoScanScope = select.value;
+      if (id === 'dash-scope' || id === 'scan-scope') {
+        window.__scenenfoScanScope = select.value;
+      }
     });
     return label;
   };
@@ -146,12 +148,24 @@
 
   function enhanceSchedules() {
     document.querySelectorAll('.schedule-editor').forEach(row => {
-      if (row.querySelector('.sched-scope')) return;
       const id = String(row.dataset.scheduleId || '');
       const schedule = window.__scenenfoSchedules.get(id);
+      const existing = row.querySelector('.sched-scope');
+
+      if (existing) {
+        if (schedule && existing.dataset.hydrated !== 'true') {
+          existing.value = schedule.scan_scope || 'incremental';
+          existing.dataset.hydrated = 'true';
+        }
+        return;
+      }
+
       const grid = row.querySelector('.schedule-head-grid');
       if (!grid) return;
-      grid.appendChild(makeScopeField('', 'sched-scope', schedule?.scan_scope || 'incremental'));
+      const field = makeScopeField('', 'sched-scope', schedule?.scan_scope || 'incremental');
+      const select = field.querySelector('select');
+      if (select) select.dataset.hydrated = schedule ? 'true' : 'false';
+      grid.appendChild(field);
       grid.style.gridTemplateColumns = '1.15fr .8fr .72fr .78fr .95fr 1.05fr';
     });
 
@@ -163,18 +177,10 @@
     }
   }
 
-  function enhanceHistory() {
-    const table = document.querySelector('.table-wrap table');
-    if (!table || !document.body.textContent.includes('Manual, scheduled and import-triggered activity.')) return;
-    // The backend already stores scan_scope/skipped/removed. Keep the existing
-    // compact table for now; details remain available through the run events.
-  }
-
   function enhanceUi() {
     enhanceDashboard();
     enhanceScan();
     enhanceSchedules();
-    enhanceHistory();
   }
 
   document.addEventListener('click', event => {
