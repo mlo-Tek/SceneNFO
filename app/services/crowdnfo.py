@@ -1,54 +1,82 @@
 from __future__ import annotations
 
-import html
 import re
+from urllib.parse import quote
+
 import httpx
 
-RELEASE_LINK_RE = re.compile(r'href=["\'](?:https?://crowdnfo\.net)?/release/(\d+)["\']', re.I)
+
+CONTENT_DISPOSITION_FILENAME_RE = re.compile(
+    r"filename\*?=(?:UTF-8''|\")?([^\";]+)",
+    re.IGNORECASE,
+)
 
 
 class CrowdNFOClient:
+    """crowdNFO client using the direct best-file endpoint.
+
+    We intentionally do not enable crowdNFO's ``fallback=true`` option here.
+    SceneNFO already manages source priority itself (srrDB -> PreDB.club ->
+    crowdNFO by default), so enabling the server-side srrDB fallback would make
+    source attribution ambiguous.
+    """
+
     def __init__(self, base_url: str, api_key: str):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
 
-    async def _release_id(self, release: str) -> int | None:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            r = await client.get(f"{self.base_url}/home/search", params={"query": release})
-            r.raise_for_status()
-            ids = list(dict.fromkeys(RELEASE_LINK_RE.findall(r.text)))
-            for rid in ids[:10]:
-                rr = await client.get(f"{self.base_url}/release/{rid}")
-                if rr.is_success and release.casefold() in html.unescape(rr.text).casefold():
-                    return int(rid)
-        return None
+    def _best_nfo_url(self, release: str) -> str:
+        encoded_release = quote(release, safe="")
+        return f"{self.base_url}/api/releases/{encoded_release}/files/best?type=NFO&raw=true"
 
     async def nfo(self, release: str) -> dict | None:
         if not self.api_key:
             return None
-        release_id = await self._release_id(release)
-        if not release_id:
-            return None
-        headers = {"X-Api-Key": self.api_key, "Accept": "application/json"}
+
+        url = self._best_nfo_url(release)
+        headers = {
+            "X-Api-Key": self.api_key,
+            "Accept": "application/octet-stream,text/plain,*/*",
+            "User-Agent": "SceneNFO/0.1",
+        }
+
+        # The raw endpoint is both lookup and download. During a scan we make
+        # this request to verify that crowdNFO really has an NFO. Apply mode may
+        # request the same URL again when crowdNFO is actually selected. This is
+        # still far cheaper and more robust than the old HTML-search -> release
+        # page -> file-list -> file-id flow.
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            r = await client.get(f"{self.base_url}/api/releases/{release_id}/files", headers=headers)
-            r.raise_for_status()
-            files = r.json()
-        nfos = [x for x in files if str(x.get("fileType", "")).upper() == "NFO"]
-        if not nfos:
+            response = await client.get(url, headers=headers)
+
+        if response.status_code in (400, 404):
             return None
-        def score(x: dict):
-            return (
-                1 if str(x.get("status", "")).casefold() == "approved" else 0,
-                x.get("cumulativeTrustGrade") or 0,
-                x.get("submissionCount") or 0,
-            )
-        nfo = max(nfos, key=score)
-        fid = nfo.get("fileId")
+
+        response.raise_for_status()
+
+        raw = response.content
+        if len(raw) < 32:
+            return None
+
+        head = raw[:256].lstrip().lower()
+        if (
+            head.startswith(b"<html")
+            or head.startswith(b"<!doctype")
+            or head.startswith(b"{")
+            or head.startswith(b"[")
+        ):
+            return None
+
+        filename = f"{release}.nfo"
+        disposition = response.headers.get("content-disposition", "")
+        match = CONTENT_DISPOSITION_FILENAME_RE.search(disposition)
+        if match:
+            candidate = match.group(1).strip().strip('"')
+            if candidate:
+                filename = candidate
+
         return {
-            "release_id": release_id,
-            "file_id": fid,
-            "filename": nfo.get("originalFileName") or f"{release}.nfo",
-            "status": nfo.get("status"),
-            "url": f"{self.base_url}/api/files/{fid}/download" if fid else None,
+            "filename": filename,
+            "url": url,
+            "status": "FOUND",
+            "endpoint": "files/best",
         }
