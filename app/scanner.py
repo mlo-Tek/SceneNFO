@@ -20,17 +20,33 @@ from .settings import get_setting
 GROUP_RE = re.compile(r"-([A-Za-z0-9][A-Za-z0-9._-]{0,40})$")
 EP_RE = re.compile(r"(?i)\bS(\d{1,2})E(\d{1,3})(?:[-_. ]?E?(\d{1,3}))?")
 GENERIC_NFOS = {"movie.nfo", "tvshow.nfo", "season.nfo"}
+NFO_POLICIES = {"replace_all", "missing_only"}
 
 
 class ScanManager:
     def __init__(self):
         self.jobs: dict[str, dict] = {}
 
-    def create(self, library: str, path: str | None = None, trigger: str = "manual", apply: bool = False) -> str:
+    def create(
+        self,
+        library: str,
+        path: str | None = None,
+        trigger: str = "manual",
+        apply: bool = False,
+        nfo_policy: str = "replace_all",
+    ) -> str:
+        if nfo_policy not in NFO_POLICIES:
+            nfo_policy = "replace_all"
         job_id = uuid4().hex
         queue: asyncio.Queue = asyncio.Queue()
-        self.jobs[job_id] = {"queue": queue, "status": "queued", "stop": False, "run_id": None}
-        asyncio.create_task(self._run(job_id, library, path, trigger, apply))
+        self.jobs[job_id] = {
+            "queue": queue,
+            "status": "queued",
+            "stop": False,
+            "run_id": None,
+            "nfo_policy": nfo_policy,
+        }
+        asyncio.create_task(self._run(job_id, library, path, trigger, apply, nfo_policy))
         return job_id
 
     async def events(self, job_id: str):
@@ -53,7 +69,15 @@ class ScanManager:
                 (run_id, utcnow(), level, event.get("type", "event"), event.get("message", ""), json.dumps(event, ensure_ascii=False)),
             )
 
-    async def _run(self, job_id: str, library: str, path: str | None, trigger: str, apply: bool):
+    async def _run(
+        self,
+        job_id: str,
+        library: str,
+        path: str | None,
+        trigger: str,
+        apply: bool,
+        nfo_policy: str,
+    ):
         job = self.jobs[job_id]
         job["status"] = "running"
         root = Path(path or get_setting("movies_path" if library == "movies" else "tv_path"))
@@ -65,7 +89,18 @@ class ScanManager:
             )
             run_id = cur.lastrowid
         job["run_id"] = run_id
-        await self._emit(job_id, run_id, {"type": "start", "message": f"Scanning {library}", "library": library, "path": str(root), "mode": mode})
+        await self._emit(
+            job_id,
+            run_id,
+            {
+                "type": "start",
+                "message": f"Scanning {library}",
+                "library": library,
+                "path": str(root),
+                "mode": mode,
+                "nfo_policy": nfo_policy,
+            },
+        )
 
         try:
             mkvs = self._find_mkvs(root)
@@ -95,7 +130,6 @@ class ScanManager:
                     classification = "scene" if pre else "p2p"
                     group = (str(pre.get("team") or "").strip() if pre else self._p2p_group(release)) or None
                     pre_id = pre.get("id") if pre else None
-                    nfos_before = self._all_nfos(media.parent)
                     action = "P2P"
                     source_name = None
                     selected = None
@@ -103,6 +137,7 @@ class ScanManager:
                     source_status = {}
                     digest_before = None
                     digest_after = None
+                    replace_candidates: list[Path] = []
 
                     if pre and group:
                         scene += 1
@@ -130,22 +165,31 @@ class ScanManager:
                                 selected = candidates[key]
                                 break
 
-                        if selected and selected.get("url"):
+                        source_names = [x.get("filename") for x in candidates.values() if x]
+                        replace_candidates = self._replace_candidates(media, release, group, source_names, library)
+
+                        if nfo_policy == "missing_only" and replace_candidates:
+                            action = "SKIPPED_PRESENT" if apply else "WOULD_SKIP_PRESENT"
+                        elif selected and selected.get("url"):
                             target_name = selected.get("filename") or f"{release}.nfo"
                             target = media.parent / Path(target_name).name
-                            replace_candidates = self._replace_candidates(
-                                media, release, group, [x.get("filename") for x in candidates.values() if x], library
-                            )
                             action = "WOULD_REPLACE" if replace_candidates else "WOULD_CREATE"
                             digest_before = self._sha256(replace_candidates[0]) if replace_candidates else None
+
                             if apply:
-                                raw = await self._download_nfo(selected["url"], crowd.api_key if source_name == "crowdnfo" else "")
+                                raw = await self._download_nfo(
+                                    selected["url"],
+                                    crowd.api_key if source_name == "crowdnfo" else "",
+                                )
                                 self._validate_nfo(raw)
                                 digest_after = hashlib.sha256(raw).hexdigest()
                                 self._atomic_write(target, raw)
-                                for old in replace_candidates:
-                                    if old != target and old.exists():
-                                        old.unlink()
+
+                                if nfo_policy == "replace_all":
+                                    for old in replace_candidates:
+                                        if old != target and old.exists():
+                                            old.unlink()
+
                                 if replace_candidates:
                                     replaced += 1
                                     action = "REPLACED_IDENTICAL" if digest_before and digest_before == digest_after else "REPLACED_CHANGED"
@@ -159,12 +203,16 @@ class ScanManager:
 
                     scanned += 1
                     nfos_after = self._all_nfos(media.parent)
-                    nfo_path = str(target if target and target.exists() else (nfos_after[0] if nfos_after else "")) or None
-                    nfo_present = bool(nfos_after)
+                    nfo_path = str(target if target and target.exists() else (replace_candidates[0] if replace_candidates else (nfos_after[0] if nfos_after else ""))) or None
+                    nfo_present = bool(replace_candidates or nfos_after)
 
                     with connection() as conn:
                         previous = conn.execute("SELECT nfo_source FROM library_items WHERE media_path=?", (str(media),)).fetchone()
-                        recorded_source = (source_name if apply and action in {"CREATED", "REPLACED_IDENTICAL", "REPLACED_CHANGED"} else (previous["nfo_source"] if previous else None))
+                        recorded_source = (
+                            source_name
+                            if apply and action in {"CREATED", "REPLACED_IDENTICAL", "REPLACED_CHANGED"}
+                            else (previous["nfo_source"] if previous else None)
+                        )
                         conn.execute(
                             """
                             INSERT INTO library_items(library,media_path,title,release_name,classification,release_group,predb_id,nfo_path,nfo_source,nfo_present,last_result,last_checked_at)
@@ -178,13 +226,29 @@ class ScanManager:
                             (library, str(media), media.parent.name, release, classification, group, pre_id, nfo_path, recorded_source, int(nfo_present), action, utcnow()),
                         )
 
-                    await self._emit(job_id, run_id, {
-                        "type": "item", "message": release, "index": idx, "total": total,
-                        "media_path": str(media), "title": media.parent.name, "release": release,
-                        "classification": classification, "group": group, "predb_id": pre_id,
-                        "nfo_present": nfo_present, "nfo_path": nfo_path, "nfo_source": source_name,
-                        "source_status": source_status, "action": action, "target": str(target) if target else None,
-                    })
+                    await self._emit(
+                        job_id,
+                        run_id,
+                        {
+                            "type": "item",
+                            "message": release,
+                            "index": idx,
+                            "total": total,
+                            "media_path": str(media),
+                            "title": media.parent.name,
+                            "release": release,
+                            "classification": classification,
+                            "group": group,
+                            "predb_id": pre_id,
+                            "nfo_present": nfo_present,
+                            "nfo_path": nfo_path,
+                            "nfo_source": source_name,
+                            "source_status": source_status,
+                            "action": action,
+                            "target": str(target) if target else None,
+                            "nfo_policy": nfo_policy,
+                        },
+                    )
                 except Exception as exc:
                     errors += 1
                     scanned += 1
@@ -192,10 +256,22 @@ class ScanManager:
 
             self._finish_run(run_id, "completed", scanned, scene, p2p, created, replaced, errors)
             job["status"] = "completed"
-            await self._emit(job_id, run_id, {
-                "type": "complete", "message": "Scan complete", "scanned": scanned, "scene": scene,
-                "p2p": p2p, "created": created, "replaced": replaced, "errors": errors, "total": total,
-            })
+            await self._emit(
+                job_id,
+                run_id,
+                {
+                    "type": "complete",
+                    "message": "Scan complete",
+                    "scanned": scanned,
+                    "scene": scene,
+                    "p2p": p2p,
+                    "created": created,
+                    "replaced": replaced,
+                    "errors": errors,
+                    "total": total,
+                    "nfo_policy": nfo_policy,
+                },
+            )
         except Exception as exc:
             job["status"] = "fatal"
             with connection() as conn:
@@ -241,9 +317,11 @@ class ScanManager:
             if name_cf in GENERIC_NFOS:
                 continue
             if name_cf in wanted:
-                out.append(nfo); continue
+                out.append(nfo)
+                continue
             if library == "movies" and Path(nfo.name).stem.casefold().endswith("-" + group.casefold()):
-                out.append(nfo); continue
+                out.append(nfo)
+                continue
             if library == "tv":
                 nfo_ep = self._episode_key(nfo.name)
                 if media_ep and nfo_ep == media_ep and Path(nfo.name).stem.casefold().endswith("-" + group.casefold()):
