@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>SceneNFO</Name>
-  <Repository>scenenfo:latest</Repository>
-  <Registry>https://github.com/mlo-Tek/SceneNFO</Registry>
+  <Repository>ghcr.io/mlo-tek/scenenfo:latest</Repository>
+  <Registry>https://github.com/mlo-Tek/SceneNFO/pkgs/container/scenenfo</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
@@ -20,7 +20,7 @@
   <DateInstalled/>
   <DonateText/>
   <DonateLink/>
-  <Requires>The Docker image must first be built locally as scenenfo:latest from the SceneNFO repository. Internet access is required for PreDB.club, srrDB and crowdNFO.</Requires>
+  <Requires>Internet access is required for PreDB.club, srrDB and crowdNFO. The GHCR package must be public so Unraid can pull the image without registry credentials.</Requires>
 
   <Config Name="WebUI Port" Target="8787" Default="8787" Mode="tcp" Description="SceneNFO WebUI / API port." Type="Port" Display="always" Required="true" Mask="false">8787</Config>
 
