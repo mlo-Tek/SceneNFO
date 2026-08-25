@@ -1,0 +1,206 @@
+/* SceneNFO 0.3.14: horizontal scan workspace and consistent controls */
+
+.scan-layout,
+.scan-layout.scan-config-collapsed{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:14px!important;
+  align-items:start!important;
+}
+
+.scan-controls{
+  position:relative!important;
+  top:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+  padding:18px 20px!important;
+}
+
+.scan-controls .section-head{
+  display:flex!important;
+  align-items:flex-start!important;
+  gap:10px!important;
+  margin-bottom:14px!important;
+}
+.scan-controls .section-head>div:first-child{min-width:0;flex:1}
+.scan-controls .section-head h2{font-size:20px!important;margin:0 0 3px}
+.scan-controls .section-head p{font-size:12.5px!important;margin:0}
+.scan-controls .section-head>.pill{align-self:center}
+
+.scan-config-toggle{
+  margin-left:4px!important;
+  min-height:38px!important;
+  height:38px!important;
+  padding:0 12px!important;
+  border-radius:10px!important;
+  font-size:12px!important;
+  font-weight:760!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  align-self:center!important;
+}
+.scan-config-toggle span{display:inline-block;margin-right:5px;font-size:13px;line-height:1}
+
+.scan-controls>.field-label{margin:0 0 7px!important;font-size:11px!important}
+.scan-controls .library-check-grid{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(190px,1fr))!important;
+  gap:9px!important;
+}
+.scan-controls .library-check{
+  min-height:64px!important;
+  padding:10px 12px!important;
+  border-radius:12px!important;
+}
+.scan-controls .library-check strong{font-size:13.5px!important}
+.scan-controls .library-check small{font-size:10.5px!important;max-width:none!important}
+
+.scan-options-grid{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(190px,1fr))!important;
+  gap:10px!important;
+  margin-top:14px!important;
+}
+.scan-options-grid .stack-field{gap:6px!important;min-width:0}
+.scan-options-grid .stack-field>span{font-size:11px!important;font-weight:760!important}
+.scan-options-grid select{
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:48px!important;
+  min-height:48px!important;
+  padding:0 14px!important;
+  border:1px solid var(--line-strong)!important;
+  border-radius:12px!important;
+  background:var(--panel-solid)!important;
+  color:var(--text)!important;
+  font-size:14.5px!important;
+  line-height:48px!important;
+  outline:none!important;
+  transition:border-color .15s ease,box-shadow .15s ease,background .15s ease!important;
+}
+.scan-options-grid select:focus{
+  border-color:var(--blue)!important;
+  box-shadow:0 0 0 3px rgba(10,124,255,.14)!important;
+}
+
+.scan-actions{
+  display:flex!important;
+  justify-content:flex-end!important;
+  align-items:center!important;
+  gap:9px!important;
+  margin-top:12px!important;
+}
+.scan-actions .btn{
+  flex:0 0 auto!important;
+  min-width:150px!important;
+  min-height:44px!important;
+  padding:0 16px!important;
+}
+.scan-controls .run-hint{
+  margin:9px 0 0!important;
+  padding:8px 10px!important;
+  font-size:11.5px!important;
+}
+.scan-progress-block{margin-top:12px!important}
+.scan-status-row{font-size:11.5px!important;margin-bottom:6px!important}
+.scan-counts{font-size:11.5px!important;margin-top:7px!important}
+
+.scan-compact-summary{display:none!important}
+
+/* Collapsed = a horizontal status bar above Live results. */
+.scan-controls.scan-config-collapsed{
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr) auto!important;
+  grid-template-areas:
+    "head summary actions"
+    "progress progress progress"!important;
+  align-items:center!important;
+  column-gap:14px!important;
+  row-gap:9px!important;
+  padding:11px 14px!important;
+}
+.scan-controls.scan-config-collapsed>.section-head{
+  grid-area:head!important;
+  margin:0!important;
+  align-items:center!important;
+  min-width:max-content!important;
+}
+.scan-controls.scan-config-collapsed .section-head>div:first-child{flex:0 0 auto}
+.scan-controls.scan-config-collapsed .section-head h2{font-size:16px!important;white-space:nowrap}
+.scan-controls.scan-config-collapsed .section-head p,
+.scan-controls.scan-config-collapsed .section-head>.pill{display:none!important}
+.scan-controls.scan-config-collapsed .scan-config-toggle{height:34px!important;min-height:34px!important;padding:0 9px!important;margin-left:4px!important}
+.scan-controls.scan-config-collapsed>.field-label,
+.scan-controls.scan-config-collapsed>.library-check-grid,
+.scan-controls.scan-config-collapsed>.scan-options-grid,
+.scan-controls.scan-config-collapsed>.run-hint{display:none!important}
+.scan-controls.scan-config-collapsed .scan-compact-summary{
+  grid-area:summary!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  font-size:11.5px!important;
+  line-height:1!important;
+  overflow:hidden!important;
+}
+.scan-summary-item{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:0 9px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--panel-soft);
+  color:var(--muted);
+  white-space:nowrap;
+}
+.scan-summary-item strong{color:var(--text);margin-right:4px}
+.scan-controls.scan-config-collapsed .scan-actions{
+  grid-area:actions!important;
+  display:flex!important;
+  margin:0!important;
+  gap:7px!important;
+}
+.scan-controls.scan-config-collapsed #run-scan{display:none!important}
+.scan-controls.scan-config-collapsed #stop-scan{
+  min-width:105px!important;
+  min-height:36px!important;
+  height:36px!important;
+  padding:0 12px!important;
+}
+.scan-controls.scan-config-collapsed .scan-progress-block{
+  grid-area:progress!important;
+  margin:0!important;
+}
+.scan-controls.scan-config-collapsed .scan-status-row{margin-bottom:5px!important}
+
+.live-results-card{
+  min-height:56vh!important;
+  padding:18px!important;
+}
+.live-results-card .section-head{margin-bottom:12px!important}
+.live-list{max-height:64vh!important;overflow:auto!important}
+.scan-layout.scan-config-collapsed .live-list{max-height:72vh!important}
+
+@media(max-width:1350px){
+  .scan-controls .library-check-grid{grid-template-columns:repeat(2,minmax(220px,1fr))!important}
+  .scan-controls.scan-config-collapsed{grid-template-columns:1fr auto!important;grid-template-areas:"head actions" "summary summary" "progress progress"!important}
+}
+
+@media(max-width:900px){
+  .scan-controls{padding:15px!important}
+  .scan-controls .library-check-grid{grid-template-columns:1fr!important}
+  .scan-options-grid{grid-template-columns:1fr!important}
+  .scan-actions{justify-content:stretch!important}
+  .scan-actions .btn{flex:1 1 0!important;min-width:0!important}
+  .scan-controls.scan-config-collapsed{grid-template-columns:1fr!important;grid-template-areas:"head" "summary" "actions" "progress"!important}
+  .scan-controls.scan-config-collapsed .scan-actions{justify-content:flex-start!important}
+  .scan-controls.scan-config-collapsed #stop-scan{flex:0 0 auto!important}
+  .scan-controls.scan-config-collapsed .scan-compact-summary{flex-wrap:wrap!important;overflow:visible!important}
+}
