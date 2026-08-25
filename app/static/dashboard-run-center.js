@@ -40,10 +40,12 @@
 
     const tabs = document.createElement('div');
     tabs.className = 'run-center-tabs';
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', 'Run center mode');
     tabs.innerHTML = `
-      <button class="run-center-tab" data-tab="quick">Quick run</button>
-      <button class="run-center-tab" data-tab="automatic">Automatic imports</button>
-      <button class="run-center-tab" data-tab="schedules">Schedules</button>`;
+      <button class="run-center-tab" role="tab" aria-selected="false" data-tab="quick">Quick run</button>
+      <button class="run-center-tab" role="tab" aria-selected="false" data-tab="automatic">Automatic imports</button>
+      <button class="run-center-tab" role="tab" aria-selected="false" data-tab="schedules">Schedules</button>`;
     quick.parentNode.insertBefore(tabs, quick);
 
     const automatic = document.createElement('div');
@@ -126,7 +128,11 @@
 
     const activate = tab => {
       localStorage.setItem('scenenfo-dashboard-run-tab', tab);
-      card.querySelectorAll('.run-center-tab').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
+      card.querySelectorAll('.run-center-tab').forEach(button => {
+        const active = button.dataset.tab === tab;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
       card.querySelectorAll('.run-center-panel').forEach(panel => { panel.hidden = panel.dataset.panel !== tab; });
     };
     card.querySelectorAll('.run-center-tab').forEach(button => button.onclick = () => activate(button.dataset.tab));
