@@ -18,7 +18,7 @@ from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.14"
+VERSION = "0.3.15"
 
 
 @asynccontextmanager
