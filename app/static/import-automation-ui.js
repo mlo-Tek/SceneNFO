@@ -17,7 +17,7 @@
 
     const description = heading.parentElement?.querySelector('p');
     if (description) {
-      description.textContent = 'Trigger a targeted run when Radarr or Sonarr imports or upgrades media. SceneNFO processes the imported MKV instead of scanning the complete library.';
+      description.textContent = 'Trigger targeted runs when Radarr or Sonarr imports or upgrades media. Radarr runs immediately; Sonarr groups consecutive episode imports into one batch.';
     }
 
     const fields = [...card.querySelectorAll('label.stack-field')];
@@ -47,6 +47,7 @@
     const actions = card.querySelector('.editor-actions');
     if (!actions) return;
 
+    const debounce = settingValue(settings, 'sonarr_import_debounce_seconds', '30');
     const fallbackWindow = settingValue(settings, 'import_fallback_window_minutes', '10');
     const fallbackMax = settingValue(settings, 'import_fallback_max_files', '5');
 
@@ -57,7 +58,19 @@
         <div><strong>Targeting</strong><span>Exact imported MKV</span></div>
         <span class="pill scene">TARGETED</span>
       </div>
-      <p>Radarr/Sonarr file paths are used directly. A new movie or episode normally creates a run containing only that MKV. An upgrade targets the replaced MKV again.</p>
+      <p>Radarr/Sonarr file paths are used directly. Radarr normally starts one tiny run for the imported movie. Sonarr waits for a short quiet period and combines consecutive episode imports from the same series into one History/Logs batch.</p>
+
+      <div class="import-batch-panel">
+        <div class="import-batch-copy">
+          <strong>Sonarr import queue</strong>
+          <span>Every new episode resets the timer. When no further episode arrives during the window, all unique MKVs from that series are processed together.</span>
+        </div>
+        <label class="stack-field import-batch-window">
+          <span>Batch debounce</span>
+          <div class="input-suffix"><input type="number" min="5" max="300" class="field automation-setting" data-key="sonarr_import_debounce_seconds" value="${esc(debounce)}"><em>seconds</em></div>
+        </label>
+      </div>
+
       <div class="import-fallback-grid">
         <label class="stack-field">
           <span>Fallback lookback</span>
