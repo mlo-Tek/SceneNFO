@@ -111,15 +111,14 @@
 
     content.innerHTML = `<div class="card section-card library-page-card">
       <div class="section-head">
-        <div><h2>${title}</h2><p>Filter, sort and manage the SceneNFO inventory. Click a title to browse its media folder.</p></div>
+        <div><h2>${title}</h2><p>Filter, sort and manage the SceneNFO inventory. Search results update automatically while you type.</p></div>
       </div>
       <div class="toolbar library-toolbar">
-        <select id="lib-config"><option value="">All ${noun} libraries</option>${libs.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
-        <input id="lib-q" class="field grow" placeholder="Search title, release or group…">
-        <select id="lib-class"><option value="">All types</option><option value="scene">Scene</option><option value="p2p">P2P</option></select>
-        <select id="lib-nfo"><option value="">All NFO</option><option value="present">NFO present</option><option value="missing">NFO missing</option></select>
-        <select id="lib-sort" title="Sort the complete matching library">${sortOptions()}</select>
-        <button class="btn secondary" id="lib-filter">Apply</button>
+        <select id="lib-config" aria-label="Library"><option value="">All ${noun} libraries</option>${libs.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
+        <input id="lib-q" class="field grow" autocomplete="off" placeholder="Search title, release or group…" aria-label="Search library">
+        <select id="lib-class" aria-label="Release type"><option value="">All types</option><option value="scene">Scene</option><option value="p2p">P2P</option></select>
+        <select id="lib-nfo" aria-label="NFO state"><option value="">All NFO</option><option value="present">NFO present</option><option value="missing">NFO missing</option></select>
+        <select id="lib-sort" title="Sort the complete matching library" aria-label="Sort library">${sortOptions()}</select>
       </div>
       <div id="lib-table" class="library-results"><div class="empty-state">Loading ${title}…</div></div>
     </div>`;
@@ -127,6 +126,7 @@
     let offset = 0;
     let limit = 100;
     let requestToken = 0;
+    let searchTimer = null;
 
     const buildParams = () => {
       const params = new URLSearchParams();
@@ -195,7 +195,7 @@
         if (token !== requestToken) return;
         target.innerHTML = `<div class="empty-state apply-error">Failed to load ${esc(title)}: ${esc(error.message)}</div>`;
       } finally {
-        target.classList.remove('loading');
+        if (token === requestToken) target.classList.remove('loading');
       }
     };
 
@@ -204,10 +204,12 @@
       loadPage();
     };
 
-    document.querySelector('#lib-filter').onclick = resetAndLoad;
-    document.querySelector('#lib-q').addEventListener('keydown', event => {
-      if (event.key === 'Enter') resetAndLoad();
-    });
+    const scheduleLiveSearch = () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(resetAndLoad, 240);
+    };
+
+    document.querySelector('#lib-q').addEventListener('input', scheduleLiveSearch);
     document.querySelector('#lib-config').addEventListener('change', resetAndLoad);
     document.querySelector('#lib-class').addEventListener('change', resetAndLoad);
     document.querySelector('#lib-nfo').addEventListener('change', resetAndLoad);
