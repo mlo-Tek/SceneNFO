@@ -12,13 +12,14 @@ from .api import router
 from .db import init_db
 from .folder_browser import router as folder_browser_router
 from .groups import seed_p2p_groups, sync_scene_groups
+from .import_webhooks import router as import_webhook_router
 from .item_management import router as item_management_router
 from .library_page import router as library_page_router
 from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.15"
+VERSION = "0.3.16"
 
 
 @asynccontextmanager
@@ -42,6 +43,9 @@ def app_health():
     return {"ok": True, "version": VERSION}
 
 
+# Targeted import routes are registered before the legacy webhook routes in api.py,
+# so Radarr/Sonarr imports use exact-file processing without walking whole libraries.
+app.include_router(import_webhook_router)
 app.include_router(router)
 app.include_router(review_router)
 app.include_router(item_management_router)
