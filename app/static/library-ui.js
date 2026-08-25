@@ -114,11 +114,15 @@
         <div><h2>${title}</h2><p>Filter, sort and manage the SceneNFO inventory. Search results update automatically while you type.</p></div>
       </div>
       <div class="toolbar library-toolbar">
-        <select id="lib-config" aria-label="Library"><option value="">All ${noun} libraries</option>${libs.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
-        <input id="lib-q" class="field grow" autocomplete="off" placeholder="Search title, release or group…" aria-label="Search library">
-        <select id="lib-class" aria-label="Release type"><option value="">All types</option><option value="scene">Scene</option><option value="p2p">P2P</option></select>
-        <select id="lib-nfo" aria-label="NFO state"><option value="">All NFO</option><option value="present">NFO present</option><option value="missing">NFO missing</option></select>
-        <select id="lib-sort" title="Sort the complete matching library" aria-label="Sort library">${sortOptions()}</select>
+        <div class="library-filter-row">
+          <select id="lib-config" aria-label="Library"><option value="">All ${noun} libraries</option>${libs.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
+          <select id="lib-sort" title="Sort the complete matching library" aria-label="Sort library">${sortOptions()}</select>
+          <select id="lib-class" aria-label="Release type"><option value="">All types</option><option value="scene">Scene</option><option value="p2p">P2P</option></select>
+          <select id="lib-nfo" aria-label="NFO state"><option value="">All NFO</option><option value="present">NFO present</option><option value="missing">NFO missing</option></select>
+        </div>
+        <div class="library-search-row">
+          <input id="lib-q" class="field grow" autocomplete="off" placeholder="Search title, release or group…" aria-label="Search library">
+        </div>
       </div>
       <div id="lib-table" class="library-results"><div class="empty-state">Loading ${title}…</div></div>
     </div>`;
