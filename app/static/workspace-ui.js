@@ -33,7 +33,11 @@
     const mode = document.querySelector('#scan-mode')?.value === 'true' ? 'Apply' : 'Dry Run';
     const policy = document.querySelector('#scan-policy')?.value === 'replace_all' ? 'Replace all' : 'Missing only';
     const scope = document.querySelector('#scan-scope')?.value === 'full' ? 'Full rescan' : 'New / changed only';
-    summary.innerHTML = `<strong>${selected} ${selected === 1 ? 'library' : 'libraries'}</strong><br>${e(mode)} · ${e(policy)}<br>${e(scope)}`;
+    summary.innerHTML = `
+      <span class="scan-summary-item"><strong>${selected}</strong> ${selected === 1 ? 'library' : 'libraries'}</span>
+      <span class="scan-summary-item">${e(mode)}</span>
+      <span class="scan-summary-item">${e(policy)}</span>
+      <span class="scan-summary-item">${e(scope)}</span>`;
   }
 
   function setScanConfigCollapsed(collapsed){
@@ -44,7 +48,9 @@
     layout.classList.toggle('scan-config-collapsed', collapsed);
     controls.classList.toggle('scan-config-collapsed', collapsed);
     if (button) {
-      button.textContent = collapsed ? 'Expand setup' : 'Collapse setup';
+      button.innerHTML = collapsed ? '<span aria-hidden="true">⌄</span> Expand' : '<span aria-hidden="true">⌃</span> Collapse';
+      button.title = collapsed ? 'Expand run configuration' : 'Collapse run configuration';
+      button.setAttribute('aria-label', button.title);
       button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
     }
     compactScanSummary();
@@ -62,11 +68,13 @@
       toggle.id = 'scan-config-toggle';
       toggle.className = 'btn secondary scan-config-toggle';
       toggle.type = 'button';
-      toggle.textContent = 'Collapse setup';
+      toggle.innerHTML = '<span aria-hidden="true">⌃</span> Collapse';
+      toggle.title = 'Collapse run configuration';
+      toggle.setAttribute('aria-label', toggle.title);
       toggle.setAttribute('aria-expanded', 'true');
       head.appendChild(toggle);
       toggle.addEventListener('click', () => {
-        setScanConfigCollapsed(!layout.classList.contains('scan-config-collapsed'));
+        setScanConfigCollapsed(!controls.classList.contains('scan-config-collapsed'));
       });
     }
 
