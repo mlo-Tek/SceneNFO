@@ -14,6 +14,11 @@
     const t = String(trigger || '');
     if (t === 'manual') return 'Manual';
     if (t === 'radarr-import') return 'Radarr import';
+    if (t === 'radarr-upgrade') return 'Radarr upgrade';
+    if (t === 'sonarr-import') return 'Sonarr import';
+    if (t === 'sonarr-upgrade') return 'Sonarr upgrade';
+    if (t === 'sonarr-import-batch') return 'Sonarr import batch';
+    if (t === 'sonarr-upgrade-batch') return 'Sonarr upgrade batch';
     if (t === 'sonarr-import-complete') return 'Sonarr import';
     if (t.startsWith('schedule:')) return `Schedule · ${t.slice(9)}`;
     if (t.startsWith('review-apply:')) return `Review apply · source #${t.slice(13)}`;
@@ -22,6 +27,7 @@
   const modeLabel = mode => mode === 'apply' ? 'Apply' : mode === 'dry-run' ? 'Dry Run' : (mode || '—');
   const scopeLabel = scope => scope === 'full' ? 'Full rescan' : 'New / changed only';
   const policyLabel = p => p === 'replace_all' ? 'Replace all' : p === 'missing_only' ? 'Missing only' : (p || '—');
+  const sourceLabel = source => ({srrdb:'srrDB', predb:'PreDB.club', crowdnfo:'crowdNFO'})[String(source || '').toLowerCase()] || source || '—';
   const runOption = r => `#${r.id} · ${localTime(r.started_at)} · ${triggerLabel(r.trigger)} · ${r.library_name || r.library || '—'} · ${modeLabel(r.mode)} · ${r.status}`;
 
   async function getJson(url, opts={}) {
@@ -48,6 +54,9 @@
         <div class="run-meta-item"><span>NFO handling</span><strong>${e(policyLabel(run.nfo_policy))}</strong></div>
       </div>
       <div class="run-summary">
+        <span class="summary-chip run-context-chip">Run: ${e(triggerLabel(run.trigger))}</span>
+        <span class="summary-chip run-context-chip">Mode: ${e(modeLabel(run.mode))}</span>
+        <span class="summary-chip run-context-chip">NFO: ${e(policyLabel(run.nfo_policy))}</span>
         <span class="summary-chip">Status: ${e(run.status)}</span>
         <span class="summary-chip">Scanned: ${Number(run.scanned || 0)}</span>
         <span class="summary-chip">Scene: ${Number(run.scene || 0)}</span>
@@ -60,16 +69,74 @@
       </div>`;
   }
 
-  function eventHtml(row) {
+  function nfoBefore(payload) {
+    const action = String(payload.action || '').toUpperCase();
+    if (['WOULD_CREATE','CREATED'].includes(action)) return false;
+    if (['WOULD_REPLACE','REPLACED_IDENTICAL','REPLACED_CHANGED','WOULD_SKIP_PRESENT','SKIPPED_PRESENT'].includes(action)) return true;
+    return Boolean(payload.nfo_present);
+  }
+
+  function nfoDecision(payload, run) {
+    const action = String(payload.action || '').toUpperCase();
+    const source = sourceLabel(payload.nfo_source);
+    const dry = run?.mode === 'dry-run';
+    const sourceSuffix = payload.nfo_source ? ` · ${source}` : '';
+    switch (action) {
+      case 'P2P': return {text:'NFO untouched · P2P', cls:'neutral'};
+      case 'WOULD_CREATE': return {text:`Would download + create${sourceSuffix}`, cls:'planned'};
+      case 'WOULD_REPLACE': return {text:`Would download + replace${sourceSuffix}`, cls:'planned'};
+      case 'WOULD_SKIP_PRESENT': return {text:'Would keep existing NFO', cls:'neutral'};
+      case 'CREATED': return {text:`Downloaded + created${sourceSuffix}`, cls:'success'};
+      case 'REPLACED_IDENTICAL': return {text:`Downloaded + replaced · identical${sourceSuffix}`, cls:'success'};
+      case 'REPLACED_CHANGED': return {text:`Downloaded + replaced · changed${sourceSuffix}`, cls:'success'};
+      case 'SKIPPED_PRESENT': return {text:'Existing NFO kept', cls:'neutral'};
+      case 'NO_SOURCE': return {text:'No usable NFO source found', cls:'warning'};
+      default:
+        return {text: dry ? (action || 'No write planned') : (action || 'No NFO action'), cls:'neutral'};
+    }
+  }
+
+  function eventHtml(row, run) {
     let payload = {};
     try { payload = JSON.parse(row.payload || '{}'); } catch {}
-    const suffix = [payload.classification ? String(payload.classification).toUpperCase() : '', payload.action || ''].filter(Boolean).join(' · ');
-    const message = `${row.message || ''}${suffix ? `  [${suffix}]` : ''}`;
+    const isItem = String(row.event || '') === 'item';
+    const isError = String(row.event || '') === 'item_error';
+
+    let messageHtml = e(row.message || '');
+    if (isItem) {
+      const classification = String(payload.classification || '').toUpperCase() || 'UNKNOWN';
+      const before = nfoBefore(payload);
+      const decision = nfoDecision(payload, run);
+      const group = payload.group ? `<span class="event-fact">Group: ${e(payload.group)}</span>` : '';
+      messageHtml = `
+        <div class="event-item-main">
+          <div class="event-item-release">${e(payload.release || row.message || '')}</div>
+          <div class="event-item-facts">
+            <span class="event-fact run">${e(triggerLabel(run.trigger))}</span>
+            <span class="event-fact mode ${run.mode === 'dry-run' ? 'dry' : 'apply'}">${e(modeLabel(run.mode))}</span>
+            <span class="event-fact classification ${classification.toLowerCase()}">${e(classification)}</span>
+            ${group}
+            <span class="event-fact nfo-before ${before ? 'present' : 'missing'}">NFO before: ${before ? 'present' : 'missing'}</span>
+            <span class="event-fact decision ${e(decision.cls)}">${e(decision.text)}</span>
+          </div>
+        </div>`;
+    } else if (isError) {
+      messageHtml = `
+        <div class="event-item-main">
+          <div class="event-item-release">${e(row.message || 'Item error')}</div>
+          <div class="event-item-facts">
+            <span class="event-fact run">${e(triggerLabel(run.trigger))}</span>
+            <span class="event-fact mode ${run.mode === 'dry-run' ? 'dry' : 'apply'}">${e(modeLabel(run.mode))}</span>
+            <span class="event-fact decision error">Item failed</span>
+          </div>
+        </div>`;
+    }
+
     return `<div class="event-row">
       <span class="event-time">${e(localTime(row.ts))}</span>
       <span class="event-level ${e(String(row.level || '').toLowerCase())}">${e(row.level || '')}</span>
       <span class="event-kind">${e(row.event || '')}</span>
-      <span class="event-message">${e(message)}</span>
+      <span class="event-message">${messageHtml}</span>
     </div>`;
   }
 
@@ -83,7 +150,7 @@
         <span class="candidate-meta">
           <span class="pill scene">SCENE</span>
           <span class="candidate-action">${e(c.action)}</span>
-          <span class="summary-chip">Source: ${e(c.nfo_source || 'none')}</span>
+          <span class="summary-chip">Source: ${e(sourceLabel(c.nfo_source || 'none'))}</span>
           ${c.group ? `<span class="summary-chip">Group: ${e(c.group)}</span>` : ''}
         </span>
         ${sources ? `<span class="candidate-release">${e(sources)}</span>` : ''}
@@ -154,11 +221,11 @@
     const candidates = review.candidates || [];
     card.innerHTML = `
       <div class="section-head">
-        <div><h2>Run #${run.id}</h2><p>Events are shown chronologically. Times are converted from UTC to <strong>${e(zone)}</strong>.</p></div>
+        <div><h2>Run #${run.id}</h2><p>Each item shows run type, mode, NFO state before processing and the resulting/planned NFO action. Times are converted from UTC to <strong>${e(zone)}</strong>.</p></div>
         <span class="pill info">${events.length} EVENTS</span>
       </div>
       ${metaHtml(run)}
-      <div class="event-list">${events.map(eventHtml).join('') || '<div class="empty-state">No events for this run.</div>'}</div>
+      <div class="event-list">${events.map(row => eventHtml(row, run)).join('') || '<div class="empty-state">No events for this run.</div>'}</div>
       <div class="review-panel">
         <div class="section-head">
           <div><h2>NFO review</h2><p>Dry-run write candidates can be applied individually or all together. Only verified Scene candidates are offered.</p></div>
