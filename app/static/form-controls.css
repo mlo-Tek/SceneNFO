@@ -1,0 +1,32 @@
+/* Unified controls for Settings, Schedules and dashboard automation. */
+.settings-stack select,
+.settings-stack input.field,
+.settings-stack input[type="number"],
+.run-center-automation select,
+.run-center-automation input[type="number"]{
+  width:100%;
+  min-height:50px!important;
+  height:50px!important;
+  border:1px solid var(--line-strong)!important;
+  border-radius:12px!important;
+  background:var(--panel-soft)!important;
+  color:var(--text)!important;
+  padding:0 14px!important;
+  font-size:16px!important;
+  line-height:1.15!important;
+  outline:none;
+  box-sizing:border-box;
+}
+.settings-stack select:focus,
+.settings-stack input.field:focus,
+.settings-stack input[type="number"]:focus,
+.run-center-automation select:focus,
+.run-center-automation input[type="number"]:focus{
+  border-color:rgba(10,124,255,.58)!important;
+  box-shadow:0 0 0 3px rgba(10,124,255,.11)!important;
+}
+.settings-stack .stack-field{gap:7px}.settings-stack .stack-field>span,.settings-stack .field-label{font-size:12.5px}
+.settings-stack .toggle-field{min-height:50px}.settings-stack .lib-kind,.settings-stack .sched-enabled,.settings-stack .sched-apply,.settings-stack .sched-policy,.settings-stack .sched-scope{min-height:50px!important;height:50px!important}
+.settings-stack .input-suffix input{min-width:0}.settings-stack .input-suffix em{min-width:max-content}
+.run-center-automation .stack-field{gap:7px}.run-center-automation .stack-field>span{font-size:12.5px}
+@media(max-width:760px){.settings-stack select,.settings-stack input.field,.settings-stack input[type="number"]{font-size:15px!important}}
