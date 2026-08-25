@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import time
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import APIRouter, Request
 
-from .db import fetchall
+from .db import connection, fetchall, utcnow
 from .scanner import scan_manager
 from .settings import get_setting
 
@@ -156,6 +159,310 @@ def _event_allowed(payload: dict) -> tuple[bool, str]:
     return False, event_type
 
 
+def _automation_options() -> tuple[bool, str]:
+    apply_changes = _enabled("import_apply", "false")
+    nfo_policy = get_setting("import_nfo_policy", "replace_all").strip().lower()
+    if nfo_policy not in {"replace_all", "missing_only"}:
+        nfo_policy = "replace_all"
+    return apply_changes, nfo_policy
+
+
+def _insert_parent_event(run_id: int, event: str, message: str, payload: dict, level: str = "INFO") -> None:
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO run_events(run_id,ts,level,event,message,payload) VALUES(?,?,?,?,?,?)",
+            (run_id, utcnow(), level, event, message, json.dumps(payload, ensure_ascii=False)),
+        )
+
+
+def _create_parent_run(library: dict, trigger: str, apply_changes: bool, nfo_policy: str, files: list[str], subject: str) -> int:
+    mode = "apply" if apply_changes else "dry-run"
+    with connection() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO runs(
+                kind,library,library_id,library_name,nfo_policy,scan_scope,
+                mode,trigger,status,started_at
+            ) VALUES('scan','tv',?,?,?,?,?,?, 'running',?)
+            """,
+            (
+                int(library["id"]),
+                str(library["name"]),
+                nfo_policy,
+                "incremental",
+                mode,
+                trigger,
+                utcnow(),
+            ),
+        )
+        run_id = int(cur.lastrowid)
+    _insert_parent_event(
+        run_id,
+        "start",
+        f"Sonarr batch: {len(files)} file(s) for {subject}",
+        {
+            "type": "start",
+            "batch": True,
+            "source": "sonarr",
+            "trigger": trigger,
+            "library_id": int(library["id"]),
+            "library_name": str(library["name"]),
+            "subject": subject,
+            "files": files,
+            "count": len(files),
+            "mode": mode,
+            "nfo_policy": nfo_policy,
+            "scan_scope": "incremental",
+        },
+    )
+    return run_id
+
+
+async def _consolidate_batch(parent_run_id: int, child_job_ids: list[str], files: list[str]) -> None:
+    deadline = asyncio.get_running_loop().time() + 7200
+    while True:
+        states = [scan_manager.jobs.get(job_id, {}).get("status") for job_id in child_job_ids]
+        if states and all(state in {"completed", "fatal", "cancelled"} for state in states):
+            break
+        if asyncio.get_running_loop().time() >= deadline:
+            with connection() as conn:
+                conn.execute(
+                    "UPDATE runs SET status='failed',finished_at=?,errors=errors+1 WHERE id=?",
+                    (utcnow(), parent_run_id),
+                )
+            _insert_parent_event(
+                parent_run_id,
+                "fatal",
+                "Sonarr batch timed out while waiting for child scans",
+                {"type": "fatal", "batch": True, "files": files},
+                "ERROR",
+            )
+            return
+        await asyncio.sleep(0.5)
+
+    child_run_ids = [
+        int(scan_manager.jobs[job_id]["run_id"])
+        for job_id in child_job_ids
+        if scan_manager.jobs.get(job_id, {}).get("run_id") is not None
+    ]
+    if not child_run_ids:
+        with connection() as conn:
+            conn.execute(
+                "UPDATE runs SET status='failed',finished_at=?,errors=errors+1 WHERE id=?",
+                (utcnow(), parent_run_id),
+            )
+        return
+
+    placeholders = ",".join("?" for _ in child_run_ids)
+    with connection() as conn:
+        children = conn.execute(
+            f"""
+            SELECT id,status,scanned,scene,p2p,created,replaced,errors,skipped,removed
+            FROM runs WHERE id IN ({placeholders}) ORDER BY id
+            """,
+            child_run_ids,
+        ).fetchall()
+
+        totals = {
+            key: sum(int(row[key] or 0) for row in children)
+            for key in ("scanned", "scene", "p2p", "created", "replaced", "errors", "skipped", "removed")
+        }
+        child_statuses = {str(row["status"]) for row in children}
+        if "failed" in child_statuses:
+            status = "failed"
+        elif "cancelled" in child_statuses:
+            status = "cancelled"
+        else:
+            status = "completed"
+
+        events = conn.execute(
+            f"""
+            SELECT ts,level,event,message,payload
+            FROM run_events
+            WHERE run_id IN ({placeholders}) AND event IN ('item','item_error')
+            ORDER BY ts,id
+            """,
+            child_run_ids,
+        ).fetchall()
+        for row in events:
+            conn.execute(
+                "INSERT INTO run_events(run_id,ts,level,event,message,payload) VALUES(?,?,?,?,?,?)",
+                (parent_run_id, row["ts"], row["level"], row["event"], row["message"], row["payload"]),
+            )
+
+        conn.execute(
+            """
+            UPDATE runs SET status=?,finished_at=?,scanned=?,scene=?,p2p=?,created=?,replaced=?,
+                errors=?,skipped=?,removed=? WHERE id=?
+            """,
+            (
+                status,
+                utcnow(),
+                totals["scanned"],
+                totals["scene"],
+                totals["p2p"],
+                totals["created"],
+                totals["replaced"],
+                totals["errors"],
+                totals["skipped"],
+                totals["removed"],
+                parent_run_id,
+            ),
+        )
+
+        # Child runs are implementation details. After consolidation only the
+        # single human-readable Sonarr batch remains in History/Logs.
+        conn.executemany("DELETE FROM runs WHERE id=?", [(run_id,) for run_id in child_run_ids])
+
+    _insert_parent_event(
+        parent_run_id,
+        "complete" if status == "completed" else status,
+        f"Sonarr batch complete: {totals['scanned']} processed from {len(files)} queued file(s)",
+        {
+            "type": "complete" if status == "completed" else status,
+            "batch": True,
+            "files": files,
+            **totals,
+        },
+        "INFO" if status == "completed" else "WARNING",
+    )
+
+
+class SonarrImportBatcher:
+    """Debounce Sonarr imports per series and consolidate them into one run."""
+
+    def __init__(self) -> None:
+        self._pending: dict[str, dict] = {}
+
+    @staticmethod
+    def _subject(payload: dict, library: dict) -> tuple[str, str]:
+        series = payload.get("series") or {}
+        series_id = str(series.get("id") or "").strip()
+        series_path = str(series.get("path") or "").strip()
+        title = str(series.get("title") or series.get("titleSlug") or Path(series_path).name or "TV import").strip()
+        identity = series_id or series_path or title
+        return f"{library['id']}:{identity}", title
+
+    async def enqueue(
+        self,
+        payload: dict,
+        targets: list[tuple[Path, dict]],
+        trigger: str,
+        apply_changes: bool,
+        nfo_policy: str,
+        fallback_used: bool,
+    ) -> dict:
+        debounce = _int_setting("sonarr_import_debounce_seconds", 30, 5, 300)
+        grouped: dict[int, list[tuple[Path, dict]]] = {}
+        for media, library in targets:
+            grouped.setdefault(int(library["id"]), []).append((media, library))
+
+        batches = []
+        for _, rows in grouped.items():
+            library = rows[0][1]
+            subject_key, subject_title = self._subject(payload, library)
+            key = f"{subject_key}:{trigger}:{int(apply_changes)}:{nfo_policy}"
+            state = self._pending.get(key)
+            if state is None:
+                state = {
+                    "batch_id": uuid4().hex,
+                    "library": library,
+                    "subject": subject_title,
+                    "trigger": trigger,
+                    "apply": apply_changes,
+                    "nfo_policy": nfo_policy,
+                    "files": {},
+                    "fallback_used": False,
+                    "task": None,
+                }
+                self._pending[key] = state
+
+            for media, _ in rows:
+                state["files"][str(media)] = str(media)
+            state["fallback_used"] = bool(state["fallback_used"] or fallback_used)
+
+            old_task = state.get("task")
+            if old_task and not old_task.done():
+                old_task.cancel()
+            state["task"] = asyncio.create_task(self._flush_after(key, debounce))
+
+            batches.append(
+                {
+                    "batch_id": state["batch_id"],
+                    "subject": state["subject"],
+                    "library": str(library["name"]),
+                    "queued_files": len(state["files"]),
+                    "debounce_seconds": debounce,
+                }
+            )
+
+        return {
+            "accepted": True,
+            "queued": True,
+            "source": "sonarr",
+            "trigger": trigger,
+            "mode": "apply" if apply_changes else "dry-run",
+            "nfo_policy": nfo_policy,
+            "fallback_used": fallback_used,
+            "batches": batches,
+        }
+
+    async def _flush_after(self, key: str, debounce: int) -> None:
+        try:
+            await asyncio.sleep(debounce)
+        except asyncio.CancelledError:
+            return
+
+        state = self._pending.pop(key, None)
+        if not state:
+            return
+
+        files = list(state["files"].values())
+        library = state["library"]
+        parent_run_id = _create_parent_run(
+            library,
+            state["trigger"] + "-batch",
+            bool(state["apply"]),
+            str(state["nfo_policy"]),
+            files,
+            str(state["subject"]),
+        )
+        _insert_parent_event(
+            parent_run_id,
+            "inventory",
+            f"Batch window closed after {debounce}s; {len(files)} unique MKV(s) queued",
+            {
+                "type": "inventory",
+                "batch": True,
+                "debounce_seconds": debounce,
+                "discovered": len(files),
+                "queued": len(files),
+                "skipped": 0,
+                "removed": 0,
+                "files": files,
+            },
+        )
+
+        child_jobs = []
+        for media in files:
+            child_jobs.append(
+                scan_manager.create(
+                    "tv",
+                    media,
+                    f"__sonarr_batch_child__:{parent_run_id}",
+                    bool(state["apply"]),
+                    str(state["nfo_policy"]),
+                    int(library["id"]),
+                    str(library["name"]),
+                    "incremental",
+                )
+            )
+        asyncio.create_task(_consolidate_batch(parent_run_id, child_jobs, files))
+
+
+sonarr_batcher = SonarrImportBatcher()
+
+
 async def _handle_import(payload: dict, kind: str, source: str) -> dict:
     enabled_key = "radarr_webhook_enabled" if source == "radarr" else "sonarr_webhook_enabled"
     if not _enabled(enabled_key):
@@ -179,18 +486,25 @@ async def _handle_import(payload: dict, kind: str, source: str) -> dict:
             "event_type": event_type or None,
         }
 
-    apply_changes = _enabled("import_apply", "false")
-    nfo_policy = get_setting("import_nfo_policy", "replace_all").strip().lower()
-    if nfo_policy not in {"replace_all", "missing_only"}:
-        nfo_policy = "replace_all"
-
+    apply_changes, nfo_policy = _automation_options()
     is_upgrade = bool(payload.get("isUpgrade"))
     trigger = f"{source}-upgrade" if is_upgrade else f"{source}-import"
+
+    if source == "sonarr":
+        result = await sonarr_batcher.enqueue(
+            payload,
+            targets,
+            trigger,
+            apply_changes,
+            nfo_policy,
+            fallback_used,
+        )
+        result["event_type"] = event_type or None
+        return result
+
+    # Radarr normally imports one movie at a time, so it can run immediately.
     jobs = []
     files = []
-
-    # One exact media file = one tiny SceneNFO run. This keeps history/logs precise
-    # and avoids ever walking the complete Radarr/Sonarr library for an import.
     for media, library in targets:
         job_id = scan_manager.create(
             kind,
