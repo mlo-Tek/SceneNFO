@@ -27,4 +27,6 @@ DEFAULTS = {
     "sonarr_webhook_enabled": "true",
     "import_apply": "false",
     "import_nfo_policy": "replace_all",
+    "import_fallback_window_minutes": "10",
+    "import_fallback_max_files": "5",
 }
