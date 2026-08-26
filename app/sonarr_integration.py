@@ -83,7 +83,10 @@ def _changed_series_folders(run_id: int) -> set[str]:
     return folders
 
 
-async def _refresh_sonarr_after_run(run_id: int) -> None:
+async def refresh_sonarr_after_run(run_id: int) -> None:
+    run = fetchone("SELECT library,mode,status FROM runs WHERE id=?", (run_id,)) or {}
+    if run.get("library") != "tv" or run.get("mode") != "apply" or run.get("status") != "completed":
+        return
     if get_setting("sonarr_refresh_after_apply", "true").lower() != "true":
         return
 
@@ -140,7 +143,8 @@ def install_sonarr_integration() -> None:
     _INSTALLED = True
 
     # radarr_integration.py already installs the ownership-aware atomic writer.
-    # This wrapper only adds the post-Apply Sonarr refresh for TV runs.
+    # This wrapper handles normal TV Apply runs. Sonarr batch child runs are
+    # intentionally skipped; their consolidated parent run triggers one refresh.
     original_run = ScanManager._run
 
     async def run_with_sonarr_refresh(
@@ -169,8 +173,9 @@ def install_sonarr_integration() -> None:
         )
         job = self.jobs.get(job_id) or {}
         run_id = job.get("run_id")
-        if library == "tv" and apply and run_id and job.get("status") == "completed":
-            await _refresh_sonarr_after_run(int(run_id))
+        is_batch_child = str(trigger or "").startswith("__sonarr_batch_child__:")
+        if library == "tv" and apply and run_id and job.get("status") == "completed" and not is_batch_child:
+            await refresh_sonarr_after_run(int(run_id))
 
     ScanManager._run = run_with_sonarr_refresh
 
