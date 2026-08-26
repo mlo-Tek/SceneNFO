@@ -40,7 +40,9 @@
       control.className = 'scroll-mode-control';
       control.dataset.scrollKey = key;
       control.innerHTML = `<span class="scroll-mode-label">${label}</span><div class="scroll-mode-segment" role="group" aria-label="${label} mode"><button type="button" data-scroll-mode="auto">Auto</button><button type="button" data-scroll-mode="manual">Manual</button></div>`;
-      host.appendChild(control);
+      const trailingPill = [...host.children].find(node => node.classList?.contains('pill'));
+      if (host.classList.contains('section-head') && trailingPill) host.insertBefore(control, trailingPill);
+      else host.appendChild(control);
       control.addEventListener('click', event => {
         const button = event.target.closest('[data-scroll-mode]');
         if (!button) return;
@@ -83,6 +85,32 @@
       const list = document.querySelector('#perf-review-list');
       if (list) list.scrollTop = 0;
     }
+  }
+
+  function liveAnchor(list) {
+    if (!list) return null;
+    const top = list.scrollTop;
+    const rows = [...list.querySelectorAll('.live-result-row')];
+    const row = rows.find(item => item.offsetTop + item.offsetHeight > top) || rows[0] || null;
+    return {
+      top,
+      height:list.scrollHeight,
+      release:row?.querySelector('.live-result-release')?.textContent || '',
+      delta:row ? row.offsetTop - top : 0,
+    };
+  }
+
+  function restoreLiveAnchor(list, before) {
+    if (!list || !before) return;
+    if (before.release) {
+      const row = [...list.querySelectorAll('.live-result-row')].find(item => item.querySelector('.live-result-release')?.textContent === before.release);
+      if (row) {
+        list.scrollTop = Math.max(0, row.offsetTop - before.delta);
+        return;
+      }
+    }
+    const growth = Math.max(0, list.scrollHeight - before.height);
+    list.scrollTop = Math.max(0, before.top + growth);
   }
 
   function enhanceLive() {
@@ -138,23 +166,14 @@
   if (originalRenderLiveRows) {
     renderLiveRows = function(...args) {
       const beforeList = document.querySelector('#live-list');
-      const before = beforeList ? {
-        top: beforeList.scrollTop,
-        height: beforeList.scrollHeight,
-      } : null;
+      const before = liveAnchor(beforeList);
       const mode = getMode('live');
       const result = originalRenderLiveRows(...args);
       enhanceLive();
       const list = document.querySelector('#live-list');
       if (list) requestAnimationFrame(() => {
-        if (mode === 'auto') {
-          list.scrollTop = 0;
-        } else if (before) {
-          // New live rows are inserted at the top. Add the growth delta so the
-          // same result remains under the reader's eyes while a run continues.
-          const growth = Math.max(0, list.scrollHeight - before.height);
-          list.scrollTop = Math.max(0, before.top + growth);
-        }
+        if (mode === 'auto') list.scrollTop = 0;
+        else restoreLiveAnchor(list, before);
       });
       return result;
     };
@@ -199,7 +218,6 @@
     };
   }
 
-  // When log sort direction changes, Auto follows the newest end of that order.
   document.addEventListener('change', event => {
     if (event.target?.id === 'perf-log-order' && getMode('logs') === 'auto') {
       setTimeout(() => snapKey('logs'), 80);
