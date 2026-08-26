@@ -16,11 +16,16 @@ from .import_webhooks import router as import_webhook_router
 from .item_management import router as item_management_router
 from .library_page import router as library_page_router
 from .performance_api import router as performance_router
+from .radarr_integration import install_radarr_integration, router as radarr_integration_router
 from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.23"
+VERSION = "0.3.24"
+
+# Install the scanner write-policy and post-Apply Radarr refresh hook before any
+# scan jobs can be created.
+install_radarr_integration()
 
 
 @asynccontextmanager
@@ -53,6 +58,7 @@ app.include_router(item_management_router)
 app.include_router(library_page_router)
 app.include_router(performance_router)
 app.include_router(folder_browser_router)
+app.include_router(radarr_integration_router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
