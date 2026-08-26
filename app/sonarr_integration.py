@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from pathlib import Path
@@ -15,7 +16,9 @@ router = APIRouter(prefix="/api/integrations/sonarr", tags=["sonarr"])
 
 WRITE_ACTIONS = {"CREATED", "REPLACED_IDENTICAL", "REPLACED_CHANGED"}
 SEASON_DIR_RE = re.compile(r"^season\s+\d+$", re.IGNORECASE)
+BATCH_CHILD_PREFIX = "__sonarr_batch_child__:"
 _INSTALLED = False
+_BATCH_REFRESH_TASKS: dict[int, asyncio.Task] = {}
 
 
 def _sonarr_client() -> SonarrClient:
@@ -136,6 +139,31 @@ async def refresh_sonarr_after_run(run_id: int) -> None:
         )
 
 
+async def _wait_for_batch_and_refresh(parent_run_id: int) -> None:
+    try:
+        deadline = asyncio.get_running_loop().time() + 7200
+        while asyncio.get_running_loop().time() < deadline:
+            run = fetchone("SELECT status FROM runs WHERE id=?", (parent_run_id,)) or {}
+            status = str(run.get("status") or "")
+            if status == "completed":
+                await refresh_sonarr_after_run(parent_run_id)
+                return
+            if status in {"failed", "cancelled"}:
+                return
+            await asyncio.sleep(0.5)
+    finally:
+        _BATCH_REFRESH_TASKS.pop(parent_run_id, None)
+
+
+def _schedule_batch_refresh(parent_run_id: int) -> None:
+    task = _BATCH_REFRESH_TASKS.get(parent_run_id)
+    if task and not task.done():
+        return
+    _BATCH_REFRESH_TASKS[parent_run_id] = asyncio.create_task(
+        _wait_for_batch_and_refresh(parent_run_id)
+    )
+
+
 def install_sonarr_integration() -> None:
     global _INSTALLED
     if _INSTALLED:
@@ -143,8 +171,9 @@ def install_sonarr_integration() -> None:
     _INSTALLED = True
 
     # radarr_integration.py already installs the ownership-aware atomic writer.
-    # This wrapper handles normal TV Apply runs. Sonarr batch child runs are
-    # intentionally skipped; their consolidated parent run triggers one refresh.
+    # Normal TV Apply runs refresh immediately after completion. Sonarr import
+    # batch children register one waiter for their consolidated parent run, so a
+    # season pack results in one RefreshSeries per affected series, not per file.
     original_run = ScanManager._run
 
     async def run_with_sonarr_refresh(
@@ -173,8 +202,18 @@ def install_sonarr_integration() -> None:
         )
         job = self.jobs.get(job_id) or {}
         run_id = job.get("run_id")
-        is_batch_child = str(trigger or "").startswith("__sonarr_batch_child__:")
-        if library == "tv" and apply and run_id and job.get("status") == "completed" and not is_batch_child:
+        trigger_text = str(trigger or "")
+
+        if trigger_text.startswith(BATCH_CHILD_PREFIX):
+            if apply and job.get("status") == "completed":
+                try:
+                    parent_run_id = int(trigger_text[len(BATCH_CHILD_PREFIX):])
+                except ValueError:
+                    return
+                _schedule_batch_refresh(parent_run_id)
+            return
+
+        if library == "tv" and apply and run_id and job.get("status") == "completed":
             await refresh_sonarr_after_run(int(run_id))
 
     ScanManager._run = run_with_sonarr_refresh
