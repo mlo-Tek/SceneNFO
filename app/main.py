@@ -19,13 +19,15 @@ from .performance_api import router as performance_router
 from .radarr_integration import install_radarr_integration, router as radarr_integration_router
 from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
+from .sonarr_integration import install_sonarr_integration, router as sonarr_integration_router
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.24"
+VERSION = "0.3.25"
 
-# Install the scanner write-policy and post-Apply Radarr refresh hook before any
-# scan jobs can be created.
+# Install the ownership-aware NFO writer first, then layer targeted post-Apply
+# refresh hooks for Movies (Radarr) and TV (Sonarr) onto the same scanner.
 install_radarr_integration()
+install_sonarr_integration()
 
 
 @asynccontextmanager
@@ -59,6 +61,7 @@ app.include_router(library_page_router)
 app.include_router(performance_router)
 app.include_router(folder_browser_router)
 app.include_router(radarr_integration_router)
+app.include_router(sonarr_integration_router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
