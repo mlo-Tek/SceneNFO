@@ -15,11 +15,12 @@ from .groups import seed_p2p_groups, sync_scene_groups
 from .import_webhooks import router as import_webhook_router
 from .item_management import router as item_management_router
 from .library_page import router as library_page_router
+from .performance_api import router as performance_router
 from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.20"
+VERSION = "0.3.21"
 
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ app.include_router(router)
 app.include_router(review_router)
 app.include_router(item_management_router)
 app.include_router(library_page_router)
+app.include_router(performance_router)
 app.include_router(folder_browser_router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
