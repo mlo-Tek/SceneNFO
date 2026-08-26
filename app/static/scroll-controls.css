@@ -15,15 +15,20 @@
 .history-performance-card>.section-head>.scroll-mode-control{margin-left:auto}
 .history-performance-card>.section-head>.pill{margin-left:2px}
 
+.logs-toolbar-v2{grid-template-columns:minmax(260px,1.4fr) minmax(150px,.62fr) minmax(145px,.56fr) auto auto auto!important}
 .logs-toolbar-v2>.scroll-mode-control{height:44px;margin-left:0;justify-self:end;align-self:end;padding:0 3px}
 .logs-events,.logs-review-list,.live-list,.scroll-mode-history-list{overscroll-behavior:contain;scrollbar-gutter:stable}
 .logs-review-actions>.scroll-mode-control{margin-left:auto}
 
 @media(max-width:1300px){
+  .logs-toolbar-v2{grid-template-columns:1fr 1fr auto!important}
+  .logs-toolbar-v2>:first-child{grid-column:1/-1}
   .logs-toolbar-v2>.scroll-mode-control{justify-self:start}
 }
 @media(max-width:760px){
   .live-results-card>.section-head,.history-performance-card>.section-head{flex-wrap:wrap}
   .live-results-card>.section-head>.scroll-mode-control,.history-performance-card>.section-head>.scroll-mode-control{margin-left:0}
   .scroll-mode-control{width:max-content}
+  .logs-toolbar-v2{grid-template-columns:1fr!important}
+  .logs-toolbar-v2>:first-child{grid-column:auto}
 }
