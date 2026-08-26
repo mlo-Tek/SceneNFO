@@ -26,6 +26,8 @@ DEFAULTS = {
     "radarr_base_url": "",
     "radarr_refresh_after_apply": "true",
     "radarr_webhook_enabled": "true",
+    "sonarr_base_url": "",
+    "sonarr_refresh_after_apply": "true",
     "sonarr_webhook_enabled": "true",
     "import_apply": "false",
     "import_nfo_policy": "replace_all",
