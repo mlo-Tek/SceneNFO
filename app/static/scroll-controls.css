@@ -1,0 +1,29 @@
+.scroll-mode-control{display:inline-flex;align-items:center;gap:7px;margin-left:auto;white-space:nowrap}
+.scroll-mode-label{font-size:10px;font-weight:800;letter-spacing:.065em;text-transform:uppercase;color:var(--muted)}
+.scroll-mode-segment{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--panel-soft)}
+.scroll-mode-segment button{height:30px;min-width:62px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;transition:background .14s ease,color .14s ease,box-shadow .14s ease}
+.scroll-mode-segment button:hover{color:var(--text)}
+.scroll-mode-segment button.active{background:var(--panel-solid);color:var(--blue);box-shadow:0 2px 8px rgba(0,0,0,.12),inset 0 0 0 1px rgba(10,124,255,.22)}
+
+.live-results-card>.section-head{align-items:center!important}
+.live-results-card>.section-head>.scroll-mode-control{margin-left:auto}
+.live-results-card>.section-head>.pill{margin-left:2px}
+
+.scroll-mode-history-list{max-height:64vh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.scroll-mode-history-list .history-list-head{position:sticky;top:0;z-index:3}
+.history-performance-card>.section-head{align-items:center}
+.history-performance-card>.section-head>.scroll-mode-control{margin-left:auto}
+.history-performance-card>.section-head>.pill{margin-left:2px}
+
+.logs-toolbar-v2>.scroll-mode-control{height:44px;margin-left:0;justify-self:end;align-self:end;padding:0 3px}
+.logs-events,.logs-review-list,.live-list,.scroll-mode-history-list{overscroll-behavior:contain;scrollbar-gutter:stable}
+.logs-review-actions>.scroll-mode-control{margin-left:auto}
+
+@media(max-width:1300px){
+  .logs-toolbar-v2>.scroll-mode-control{justify-self:start}
+}
+@media(max-width:760px){
+  .live-results-card>.section-head,.history-performance-card>.section-head{flex-wrap:wrap}
+  .live-results-card>.section-head>.scroll-mode-control,.history-performance-card>.section-head>.scroll-mode-control{margin-left:0}
+  .scroll-mode-control{width:max-content}
+}
