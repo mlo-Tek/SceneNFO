@@ -7,9 +7,9 @@
 .import-fallback-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.input-suffix{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px}.input-suffix em{font-style:normal;color:var(--muted);font-size:11.5px}
 .import-fallback-note{margin-top:10px!important}
 .import-webhook-endpoints{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.import-webhook-endpoints>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-solid)}.import-webhook-endpoints span{font-size:11px;color:var(--muted);font-weight:750}.import-webhook-endpoints code{font-size:11.5px;color:var(--text);overflow-wrap:anywhere}
-.radarr-integration-panel{border-color:rgba(10,124,255,.28);background:linear-gradient(180deg,rgba(10,124,255,.045),var(--panel-soft))}
-.radarr-integration-grid{display:grid;grid-template-columns:minmax(260px,1.15fr) minmax(240px,1fr) minmax(210px,.72fr);gap:10px;align-items:end}
-.radarr-test-actions{align-items:center}.radarr-test-actions .muted{font-size:12px;overflow-wrap:anywhere}
-@media(max-width:1100px){.radarr-integration-grid{grid-template-columns:1fr 1fr}.radarr-integration-grid .stack-field:last-child{grid-column:1/-1}}
+.arr-integration-panel{background:linear-gradient(180deg,rgba(10,124,255,.04),var(--panel-soft))}.radarr-integration-panel{border-color:rgba(10,124,255,.28)}.sonarr-integration-panel{border-color:rgba(123,92,255,.30);background:linear-gradient(180deg,rgba(123,92,255,.045),var(--panel-soft))}
+.arr-integration-grid{display:grid;grid-template-columns:minmax(260px,1.15fr) minmax(240px,1fr) minmax(210px,.72fr);gap:10px;align-items:end}
+.arr-test-actions{align-items:center}.arr-test-actions .muted{font-size:12px;overflow-wrap:anywhere}
+@media(max-width:1100px){.arr-integration-grid{grid-template-columns:1fr 1fr}.arr-integration-grid .stack-field:last-child{grid-column:1/-1}}
 @media(max-width:900px){.import-batch-panel{grid-template-columns:1fr}}
-@media(max-width:760px){.import-fallback-grid,.import-webhook-endpoints,.radarr-integration-grid{grid-template-columns:1fr}.radarr-integration-grid .stack-field:last-child{grid-column:auto}}
+@media(max-width:760px){.import-fallback-grid,.import-webhook-endpoints,.arr-integration-grid{grid-template-columns:1fr}.arr-integration-grid .stack-field:last-child{grid-column:auto}}
