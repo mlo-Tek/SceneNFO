@@ -1,0 +1,11 @@
+.discord-weekly-section{border-top:3px solid rgba(88,101,242,.88)}
+.discord-weekly-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}
+.discord-weekly-head h2{margin:0 0 5px}.discord-weekly-head p{margin:0;color:var(--muted);line-height:1.5;max-width:900px}
+.discord-weekly-grid{display:grid;grid-template-columns:minmax(170px,.6fr) minmax(360px,1.7fr) minmax(180px,.7fr) minmax(170px,.6fr);gap:14px;align-items:end}
+.discord-weekly-grid .discord-webhook-field{grid-column:span 3}
+.discord-weekly-preview-wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-soft)}
+.discord-preview-label{font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.discord-weekly-preview{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.discord-weekly-preview span{padding:6px 9px;border-radius:9px;background:var(--panel-solid);border:1px solid var(--line);font-size:12px;color:var(--muted)}.discord-weekly-preview strong{color:var(--text)}
+.discord-weekly-actions{align-items:center}.discord-weekly-actions .muted{font-size:12px;overflow-wrap:anywhere}
+@media(max-width:1200px){.discord-weekly-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.discord-weekly-grid .discord-webhook-field{grid-column:1/-1}}
+@media(max-width:720px){.discord-weekly-grid{grid-template-columns:1fr}.discord-weekly-grid .discord-webhook-field{grid-column:auto}.discord-weekly-head{flex-direction:column}}
