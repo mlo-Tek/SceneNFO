@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api import router
 from .db import init_db
+from .discord_summary import router as discord_summary_router
 from .folder_browser import router as folder_browser_router
 from .groups import seed_p2p_groups, sync_scene_groups
 from .import_webhooks import router as import_webhook_router
@@ -22,7 +23,7 @@ from .scheduler import refresh_schedule, scheduler
 from .sonarr_integration import install_sonarr_integration, router as sonarr_integration_router
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.25"
+VERSION = "0.3.26"
 
 # Install the ownership-aware NFO writer first, then layer targeted post-Apply
 # refresh hooks for Movies (Radarr) and TV (Sonarr) onto the same scanner.
@@ -62,6 +63,7 @@ app.include_router(performance_router)
 app.include_router(folder_browser_router)
 app.include_router(radarr_integration_router)
 app.include_router(sonarr_integration_router)
+app.include_router(discord_summary_router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
