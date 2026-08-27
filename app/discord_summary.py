@@ -7,11 +7,26 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from .db import connection
-from .settings import get_setting
+from .settings import get_setting, public_settings, set_setting
 
 router = APIRouter(prefix="/api/integrations/discord", tags=["discord"])
+
+DISCORD_SETTING_KEYS = {
+    "discord_weekly_enabled",
+    "discord_weekly_webhook_url",
+    "discord_weekly_day",
+    "discord_weekly_time",
+    "discord_weekly_timezone",
+    "discord_weekly_include_nfo",
+    "discord_weekly_send_empty",
+}
+
+
+class DiscordSettingsUpdate(BaseModel):
+    values: dict[str, str]
 
 
 def _enabled(key: str, default: str = "false") -> bool:
@@ -37,6 +52,39 @@ def _valid_webhook_url(url: str) -> bool:
         and host in {"discord.com", "discordapp.com", "canary.discord.com", "ptb.discord.com"}
         and parsed.path.startswith("/api/webhooks/")
     )
+
+
+def _validate_settings(values: dict[str, str]) -> None:
+    if "discord_weekly_webhook_url" in values:
+        value = str(values["discord_weekly_webhook_url"]).strip()
+        if value and value != "••••••••" and not _valid_webhook_url(value):
+            raise HTTPException(400, "invalid Discord webhook URL")
+
+    if "discord_weekly_day" in values:
+        day = str(values["discord_weekly_day"]).strip().lower()
+        if day not in {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}:
+            raise HTTPException(400, "invalid weekday")
+
+    if "discord_weekly_time" in values:
+        raw = str(values["discord_weekly_time"]).strip()
+        try:
+            hour_text, minute_text = raw.split(":", 1)
+            hour, minute = int(hour_text), int(minute_text)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(400, "time must use HH:MM") from exc
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise HTTPException(400, "time must use HH:MM")
+
+    if "discord_weekly_timezone" in values:
+        name = str(values["discord_weekly_timezone"]).strip()
+        try:
+            ZoneInfo(name)
+        except ZoneInfoNotFoundError as exc:
+            raise HTTPException(400, "unknown timezone") from exc
+
+    for key in ("discord_weekly_enabled", "discord_weekly_include_nfo", "discord_weekly_send_empty"):
+        if key in values and str(values[key]).strip().lower() not in {"true", "false"}:
+            raise HTTPException(400, f"{key} must be true or false")
 
 
 def _event_payloads(run_ids: list[int]) -> dict[int, dict]:
@@ -233,6 +281,28 @@ async def send_weekly_discord_summary(*, test: bool = False) -> dict:
         response.raise_for_status()
 
     return {"sent": True, "stats": stats}
+
+
+@router.put("/settings")
+def save_discord_weekly_settings(body: DiscordSettingsUpdate):
+    values = {
+        key: str(value)
+        for key, value in body.values.items()
+        if key in DISCORD_SETTING_KEYS
+    }
+    _validate_settings(values)
+    for key, value in values.items():
+        if value == "••••••••":
+            continue
+        set_setting(key, value)
+
+    # Import lazily to avoid a module-level circular dependency: scheduler
+    # imports send_weekly_discord_summary when it builds the weekly job.
+    from .scheduler import refresh_schedule
+
+    refresh_schedule()
+    settings = public_settings()
+    return {key: settings.get(key) for key in sorted(DISCORD_SETTING_KEYS)}
 
 
 @router.get("/preview")
