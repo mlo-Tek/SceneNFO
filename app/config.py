@@ -34,4 +34,11 @@ DEFAULTS = {
     "sonarr_import_debounce_seconds": "30",
     "import_fallback_window_minutes": "10",
     "import_fallback_max_files": "5",
+    "discord_weekly_enabled": "false",
+    "discord_weekly_webhook_url": "",
+    "discord_weekly_day": "sun",
+    "discord_weekly_time": "20:00",
+    "discord_weekly_timezone": "Europe/Berlin",
+    "discord_weekly_include_nfo": "true",
+    "discord_weekly_send_empty": "true",
 }
