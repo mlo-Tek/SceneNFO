@@ -3,7 +3,12 @@ from __future__ import annotations
 from .db import connection, utcnow
 from .secrets import decrypt, encrypt
 
-SECRET_KEYS = {"crowdnfo_api_key", "radarr_api_key", "sonarr_api_key"}
+SECRET_KEYS = {
+    "crowdnfo_api_key",
+    "radarr_api_key",
+    "sonarr_api_key",
+    "discord_weekly_webhook_url",
+}
 
 
 def get_setting(key: str, default: str = "") -> str:
