@@ -16,6 +16,7 @@ from .groups import seed_p2p_groups, sync_scene_groups
 from .import_webhooks import router as import_webhook_router
 from .item_management import router as item_management_router
 from .library_page import router as library_page_router
+from .path_repair import install_scanner_path_repair, repair_saved_library_items
 from .performance_api import router as performance_router
 from .radarr_integration import install_radarr_integration, router as radarr_integration_router
 from .review import router as review_router
@@ -23,17 +24,19 @@ from .scheduler import refresh_schedule, scheduler
 from .sonarr_integration import install_sonarr_integration, router as sonarr_integration_router
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.27"
+VERSION = "0.3.28"
 
 # Install the ownership-aware NFO writer first, then layer targeted post-Apply
 # refresh hooks for Movies (Radarr) and TV (Sonarr) onto the same scanner.
 install_radarr_integration()
 install_sonarr_integration()
+install_scanner_path_repair()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    repair_saved_library_items()
     seed_p2p_groups()
     asyncio.create_task(sync_scene_groups())
     if not scheduler.running:

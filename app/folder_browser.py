@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from .db import fetchone
+from .path_repair import repair_item_media_path, resolve_case_insensitive
 
 router = APIRouter(prefix="/api")
 
@@ -44,7 +45,7 @@ def _browser_root(item: dict, media: Path) -> Path:
     kind = item.get("library_kind") or item.get("library")
 
     if kind == "tv" and library_path:
-        library_root = Path(library_path)
+        library_root = resolve_case_insensitive(Path(library_path)) or Path(library_path)
         try:
             relative = media.relative_to(library_root)
             if len(relative.parts) >= 2:
@@ -91,8 +92,8 @@ def _entry(path: Path, root: Path) -> dict:
 @router.get("/items/{item_id}/folder")
 def item_folder(item_id: int, path: str = ""):
     item = _item_or_404(item_id)
-    media = Path(item["media_path"])
-    if not media.is_file():
+    media = repair_item_media_path(item)
+    if media is None or not media.is_file():
         raise HTTPException(409, "media file no longer exists")
 
     root = _browser_root(item, media)
