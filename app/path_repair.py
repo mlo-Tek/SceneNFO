@@ -66,9 +66,16 @@ def resolve_case_insensitive(path: Path) -> Path | None:
 def _corrected_nfo_path(old_media: Path, new_media: Path, nfo_path: str | None) -> str | None:
     if not nfo_path:
         return nfo_path
+
     nfo = Path(nfo_path)
+    resolved = resolve_case_insensitive(nfo)
+    if resolved is not None and resolved.is_file():
+        return str(resolved)
+
     if _parts_casefold(nfo.parent) == _parts_casefold(old_media.parent):
-        return str(new_media.parent / nfo.name)
+        candidate = new_media.parent / nfo.name
+        resolved = resolve_case_insensitive(candidate)
+        return str(resolved if resolved is not None and resolved.is_file() else candidate)
     return nfo_path
 
 
