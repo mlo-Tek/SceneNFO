@@ -144,6 +144,33 @@
     });
   }
 
+  function enhanceInitialDashboardWhenReady() {
+    if (typeof currentView !== 'undefined' && currentView !== 'dashboard') return;
+
+    if (document.querySelector('.stats-grid')) {
+      enhanceRecentlyAdded().catch(() => {});
+      return;
+    }
+
+    const root = document.querySelector('#content');
+    if (!root) {
+      setTimeout(enhanceInitialDashboardWhenReady, 25);
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      if (typeof currentView !== 'undefined' && currentView !== 'dashboard') {
+        observer.disconnect();
+        return;
+      }
+      if (!root.querySelector('.stats-grid')) return;
+      observer.disconnect();
+      enhanceRecentlyAdded().catch(() => {});
+    });
+    observer.observe(root, {childList: true, subtree: true});
+    setTimeout(() => observer.disconnect(), 5000);
+  }
+
   const previousDashboard = typeof renderDashboard === 'function' ? renderDashboard : null;
   if (previousDashboard) {
     renderDashboard = async function(...args) {
@@ -153,7 +180,5 @@
     };
   }
 
-  if (typeof currentView !== 'undefined' && currentView === 'dashboard') {
-    setTimeout(() => enhanceRecentlyAdded().catch(() => {}), 0);
-  }
+  enhanceInitialDashboardWhenReady();
 })();
