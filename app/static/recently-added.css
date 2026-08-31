@@ -1,0 +1,141 @@
+.recently-added-card {
+  margin-top: 16px;
+}
+
+.recently-added-head {
+  margin-bottom: 12px;
+}
+
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.recent-column {
+  min-width: 0;
+}
+
+.recent-column + .recent-column {
+  border-left: 1px solid var(--border);
+  padding-left: 18px;
+}
+
+.recent-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.recent-column-head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.recent-view-all {
+  padding: 5px 9px;
+  min-height: 0;
+  font-size: 12px;
+}
+
+.recent-list {
+  border-top: 1px solid var(--border);
+}
+
+.recent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.recent-main {
+  min-width: 0;
+}
+
+.recent-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recent-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.recent-episode {
+  flex: 0 0 auto;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.recent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.recent-type {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .04em;
+}
+
+.recent-side {
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 11px;
+}
+
+.recent-nfo.present {
+  color: var(--success, #48b67c);
+}
+
+.recent-nfo.missing {
+  color: var(--muted);
+}
+
+.recent-empty {
+  padding: 14px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  .recent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-column + .recent-column {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .recent-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .recent-side {
+    text-align: left;
+  }
+}
