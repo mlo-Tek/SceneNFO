@@ -25,7 +25,7 @@ from .scheduler import refresh_schedule, scheduler
 from .sonarr_integration import install_sonarr_integration, router as sonarr_integration_router
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.30"
+VERSION = "0.3.31"
 
 # Install the ownership-aware NFO writer first, then layer targeted post-Apply
 # refresh hooks for Movies (Radarr) and TV (Sonarr) onto the same scanner.
