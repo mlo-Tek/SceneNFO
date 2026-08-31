@@ -19,12 +19,13 @@ from .library_page import router as library_page_router
 from .path_repair import install_scanner_path_repair, repair_saved_library_items
 from .performance_api import router as performance_router
 from .radarr_integration import install_radarr_integration, router as radarr_integration_router
+from .recent import router as recent_router
 from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
 from .sonarr_integration import install_sonarr_integration, router as sonarr_integration_router
 
 STATIC = Path(__file__).parent / "static"
-VERSION = "0.3.28"
+VERSION = "0.3.29"
 
 # Install the ownership-aware NFO writer first, then layer targeted post-Apply
 # refresh hooks for Movies (Radarr) and TV (Sonarr) onto the same scanner.
@@ -67,6 +68,7 @@ app.include_router(folder_browser_router)
 app.include_router(radarr_integration_router)
 app.include_router(sonarr_integration_router)
 app.include_router(discord_summary_router)
+app.include_router(recent_router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
