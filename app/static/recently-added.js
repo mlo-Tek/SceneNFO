@@ -45,14 +45,66 @@
     </div>`;
   }
 
+  function tvGroupKey(item) {
+    const title = item.display_title || item.title || item.release_name || 'Unknown';
+    return `${item.configured_library || ''}\u0000${title}`;
+  }
+
+  function groupTvItems(items) {
+    const groups = [];
+    const byKey = new Map();
+    for (const item of items || []) {
+      const key = tvGroupKey(item);
+      let group = byKey.get(key);
+      if (!group) {
+        group = {title: item.display_title || item.title || item.release_name || 'Unknown', items: []};
+        byKey.set(key, group);
+        groups.push(group);
+      }
+      group.items.push(item);
+    }
+    return groups;
+  }
+
+  function recentTvEpisode(item) {
+    const classification = String(item.classification || '').toLowerCase();
+    const type = classification === 'scene' ? 'SCENE' : classification === 'p2p' ? 'P2P' : '—';
+    const group = item.release_group || 'Unknown group';
+    return `<div class="recent-tv-episode-row">
+      <div class="recent-tv-episode-main">
+        <span class="recent-episode">${html(item.episode || 'Episode')}</span>
+        <span>${html(localTime(item.updated_at))}</span>
+        <span class="recent-type ${html(classification)}">${html(type)}</span>
+        <span>${html(group)}</span>
+      </div>
+      <div class="recent-side">${nfoText(item)}</div>
+    </div>`;
+  }
+
+  function recentTvGroup(group) {
+    if (group.items.length === 1) return recentRow(group.items[0], true);
+    return `<div class="recent-tv-group">
+      <div class="recent-tv-series-head">
+        <strong>${html(group.title)}</strong>
+        <span>${group.items.length} episodes</span>
+      </div>
+      <div class="recent-tv-episode-list">
+        ${group.items.map(recentTvEpisode).join('')}
+      </div>
+    </div>`;
+  }
+
   function recentColumn(title, view, items, tv=false) {
+    const rows = tv
+      ? groupTvItems(items).map(recentTvGroup).join('')
+      : (items || []).map(item => recentRow(item, false)).join('');
     return `<section class="recent-column">
       <div class="recent-column-head">
         <h3>${html(title)}</h3>
         <button class="btn secondary recent-view-all" data-view="${html(view)}">View all</button>
       </div>
       <div class="recent-list">
-        ${items?.length ? items.map(item => recentRow(item, tv)).join('') : '<div class="recent-empty">No inventoried items yet.</div>'}
+        ${rows || '<div class="recent-empty">No inventoried items yet.</div>'}
       </div>
     </section>`;
   }
