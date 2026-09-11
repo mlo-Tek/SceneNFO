@@ -13,7 +13,7 @@
   <Category>MediaApp:Other Tools:</Category>
   <WebUI>http://[IP]:[PORT:8787]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/mlo-Tek/SceneNFO/main/unraid/SceneNFO.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/mlo-Tek/SceneNFO/main/assets/scenenfo.png</Icon>
+  <Icon>https://raw.githubusercontent.com/mlo-Tek/SceneNFO/main/assets/container-icons/scenenfo.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>
