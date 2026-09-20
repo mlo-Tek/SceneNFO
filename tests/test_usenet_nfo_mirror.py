@@ -4,7 +4,9 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import app.usenet_nfo_mirror as mirror
 from app.usenet_nfo_mirror import (
     _find_hardlink_peer,
     _mirror_scene_nfo,
@@ -42,6 +44,42 @@ class UsenetNFOMirrorTests(unittest.TestCase):
             self.assertEqual(mirrored, expected)
             self.assertEqual(expected.read_bytes(), raw)
             self.assertEqual(writes, [(expected, raw)])
+
+    def test_renamed_radarr_file_maps_to_original_release_for_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            media_root = root / "media"
+            media_dir = media_root / "movies" / "Nicht auflegen! (2003) [tmdb-1817]"
+            usenet_root = root / "usenet"
+            usenet_dir = usenet_root / "movies" / "Nicht.auflegen.2002.German.EAC3.DL.1080p.BluRay.x265-VECTOR"
+            media_dir.mkdir(parents=True)
+            usenet_dir.mkdir(parents=True)
+
+            renamed = media_dir / "Phone Booth (2003) [tmdb-1817] - [German DL][Bluray-1080p][EAC3 5.1][x265]-VECTOR.mkv"
+            renamed.write_bytes(b"video")
+            original = usenet_dir / "Nicht.auflegen.2002.German.EAC3.DL.1080p.BluRay.x265-VECTOR.mkv"
+            os.link(renamed, original)
+
+            old_index = mirror._usenet_inode_index
+            old_aliases = mirror._release_aliases
+            old_index_refresh = mirror._last_index_refresh
+            old_alias_refresh = mirror._last_alias_refresh
+            try:
+                mirror._usenet_inode_index = {}
+                mirror._release_aliases = {}
+                mirror._last_index_refresh = 0.0
+                mirror._last_alias_refresh = 0.0
+                with patch.object(mirror, "_configured_usenet_roots", return_value=[usenet_root]), patch.object(
+                    mirror, "_configured_media_roots", return_value=[media_root]
+                ):
+                    resolved = mirror._resolve_release_alias(renamed.stem, force=True)
+            finally:
+                mirror._usenet_inode_index = old_index
+                mirror._release_aliases = old_aliases
+                mirror._last_index_refresh = old_index_refresh
+                mirror._last_alias_refresh = old_alias_refresh
+
+            self.assertEqual(resolved, original.stem)
 
     def test_hardlink_peer_requires_same_inode(self):
         with tempfile.TemporaryDirectory() as tmp:
