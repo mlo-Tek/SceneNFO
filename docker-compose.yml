@@ -8,6 +8,7 @@ services:
     volumes:
       - /mnt/cache/appdata/scenenfo/config:/config
       - /mnt/user/data/media:/data/media
+      - /mnt/user/data/usenet:/data/usenet
     environment:
       - TZ=Europe/Berlin
       - SCENENFO_CONFIG_DIR=/config
