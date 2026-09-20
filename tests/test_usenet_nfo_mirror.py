@@ -10,12 +10,13 @@ import app.usenet_nfo_mirror as mirror
 from app.usenet_nfo_mirror import (
     _find_hardlink_peer,
     _mirror_scene_nfo,
+    _replace_with_hardlink,
     _select_media_for_nfo,
 )
 
 
 class UsenetNFOMirrorTests(unittest.TestCase):
-    def test_movie_nfo_is_mirrored_with_original_release_name(self):
+    def test_movie_nfo_is_hardlinked_with_original_release_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             media_dir = root / "media" / "movies" / "Phone Booth (2003)"
@@ -28,22 +29,34 @@ class UsenetNFOMirrorTests(unittest.TestCase):
             peer = usenet_dir / "Nicht.auflegen.2002.German.EAC3.DL.1080p.BluRay.x265-VECTOR.mkv"
             os.link(media, peer)
 
-            target = media_dir / "Nicht.auflegen.2002.German.EAC3.DL.1080p.BluRay.x265-VECTOR.nfo"
-            target.write_bytes(b"existing media nfo")
+            target = media_dir / "Downloaded.Scene.NFO-VECTOR.nfo"
             raw = b"This is a valid Scene NFO payload that is comfortably longer than 32 bytes."
+            target.write_bytes(raw)
 
-            writes = []
-
-            def atomic_write(path: Path, payload: bytes):
-                writes.append((path, payload))
-                path.write_bytes(payload)
-
-            mirrored = _mirror_scene_nfo(target, raw, atomic_write, [root / "usenet" / "movies"])
+            mirrored = _mirror_scene_nfo(target, [root / "usenet" / "movies"])
 
             expected = peer.with_suffix(".nfo")
             self.assertEqual(mirrored, expected)
             self.assertEqual(expected.read_bytes(), raw)
-            self.assertEqual(writes, [(expected, raw)])
+            self.assertTrue(os.path.samefile(target, expected))
+            self.assertEqual(target.stat().st_ino, expected.stat().st_ino)
+            self.assertGreaterEqual(target.stat().st_nlink, 2)
+
+    def test_existing_usenet_nfo_is_replaced_by_hardlink_not_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "media.nfo"
+            target = root / "usenet.nfo"
+            source.write_bytes(b"new Scene NFO payload")
+            target.write_bytes(b"old independent NFO payload")
+            old_target_inode = target.stat().st_ino
+
+            _replace_with_hardlink(source, target)
+
+            self.assertNotEqual(target.stat().st_ino, old_target_inode)
+            self.assertTrue(os.path.samefile(source, target))
+            self.assertEqual(source.stat().st_ino, target.stat().st_ino)
+            self.assertEqual(target.read_bytes(), source.read_bytes())
 
     def test_renamed_radarr_file_maps_to_original_release_for_lookup(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -117,23 +130,17 @@ class UsenetNFOMirrorTests(unittest.TestCase):
 
             self.assertEqual(_select_media_for_nfo(target), ep2)
 
-    def test_generic_metadata_nfo_is_never_mirrored(self):
+    def test_generic_metadata_nfo_is_never_hardlinked(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             media = folder / "Movie.mkv"
             media.write_bytes(b"video")
             target = folder / "movie.nfo"
-            writes = []
+            target.write_bytes(b"generic metadata")
 
-            mirrored = _mirror_scene_nfo(
-                target,
-                b"A valid enough NFO payload that should never be written here.",
-                lambda path, raw: writes.append((path, raw)),
-                [folder],
-            )
+            mirrored = _mirror_scene_nfo(target, [folder])
 
             self.assertIsNone(mirrored)
-            self.assertEqual(writes, [])
 
 
 if __name__ == "__main__":
