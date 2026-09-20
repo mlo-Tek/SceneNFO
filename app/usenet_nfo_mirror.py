@@ -18,6 +18,7 @@ EP_RE = re.compile(r"(?i)\bS(\d{1,2})E(\d{1,3})(?:[-_. ]?E?(\d{1,3}))?")
 DEFAULT_USENET_ROOT = "/data/usenet"
 DEFAULT_MEDIA_ROOT = "/data/media"
 INDEX_REFRESH_SECONDS = 60.0
+FAILED_LOOKUP_REFRESH_SECONDS = 5.0
 
 _installed = False
 _missing_root_warnings: set[str] = set()
@@ -25,6 +26,7 @@ _usenet_inode_index: dict[tuple[int, int, int], list[Path]] = {}
 _release_aliases: dict[str, str | None] = {}
 _last_index_refresh = 0.0
 _last_alias_refresh = 0.0
+_last_failed_lookup_refresh = 0.0
 
 
 def _episode_key(name: str) -> str | None:
@@ -141,8 +143,6 @@ def _find_hardlink_peer(media: Path, roots: list[Path] | None = None) -> Path | 
         matches = _build_inode_index(roots).get(stat_key, [])
     else:
         matches = _get_usenet_inode_index().get(stat_key, [])
-        if not matches and time.monotonic() - _last_index_refresh >= INDEX_REFRESH_SECONDS:
-            matches = _get_usenet_inode_index(force=True).get(stat_key, [])
 
     unique = sorted(set(matches), key=lambda p: str(p).casefold())
     if len(unique) > 1:
@@ -251,6 +251,7 @@ def install_usenet_nfo_mirror() -> None:
     original_crowdnfo_nfo = CrowdNFOClient.nfo
 
     async def exact_release_with_original_name(client, release: str):
+        global _last_failed_lookup_refresh
         mapped = _resolve_release_alias(release)
         result = await original_predb_exact(client, mapped)
         if result or mapped != release:
@@ -258,8 +259,12 @@ def install_usenet_nfo_mirror() -> None:
                 log.info("Using original Usenet release name for lookup: %s -> %s", release, mapped)
             return result
 
-        # A new Radarr/Sonarr import may have appeared after the cache was built.
-        # Refresh once on a failed lookup so the new hardlink becomes immediately usable.
+        # A hardlink can appear after the cache was built. Retry with a fresh index,
+        # but throttle misses so P2P-heavy scans do not repeatedly walk both trees.
+        now = time.monotonic()
+        if now - _last_failed_lookup_refresh < FAILED_LOOKUP_REFRESH_SECONDS:
+            return result
+        _last_failed_lookup_refresh = now
         refreshed = _resolve_release_alias(release, force=True)
         if refreshed != release:
             log.info("Using newly indexed Usenet release name for lookup: %s -> %s", release, refreshed)
