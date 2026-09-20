@@ -23,6 +23,7 @@ from .recent import router as recent_router
 from .review import router as review_router
 from .scheduler import refresh_schedule, scheduler
 from .sonarr_integration import install_sonarr_integration, router as sonarr_integration_router
+from .usenet_nfo_mirror import install_usenet_nfo_mirror
 
 STATIC = Path(__file__).parent / "static"
 VERSION = "0.3.31"
@@ -32,6 +33,7 @@ VERSION = "0.3.31"
 install_radarr_integration()
 install_sonarr_integration()
 install_scanner_path_repair()
+install_usenet_nfo_mirror()
 
 
 @asynccontextmanager
