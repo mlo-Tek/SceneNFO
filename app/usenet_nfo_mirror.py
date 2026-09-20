@@ -5,6 +5,7 @@ import os
 import re
 import time
 from pathlib import Path
+from uuid import uuid4
 
 from .scanner import GENERIC_NFOS, ScanManager
 from .services.crowdnfo import CrowdNFOClient
@@ -100,8 +101,8 @@ def _build_inode_index(roots: list[Path]) -> dict[tuple[int, int, int], list[Pat
             key = str(root)
             if key not in _missing_root_warnings:
                 log.warning(
-                    "Usenet NFO mirror root is unavailable: %s. "
-                    "Mount /mnt/user/data/usenet as /data/usenet in SceneNFO to enable mirroring.",
+                    "Usenet NFO hardlink root is unavailable: %s. "
+                    "Mount /mnt/user/data/usenet as /data/usenet in SceneNFO to enable NFO hardlinking.",
                     root,
                 )
                 _missing_root_warnings.add(key)
@@ -147,7 +148,7 @@ def _find_hardlink_peer(media: Path, roots: list[Path] | None = None) -> Path | 
     unique = sorted(set(matches), key=lambda p: str(p).casefold())
     if len(unique) > 1:
         log.warning(
-            "Skipping Usenet NFO mirror for %s: multiple hardlink peers found (%s)",
+            "Skipping Usenet NFO hardlink for %s: multiple MKV hardlink peers found (%s)",
             media,
             ", ".join(str(p) for p in unique),
         )
@@ -205,17 +206,42 @@ def _resolve_release_alias(release: str, force: bool = False) -> str:
     return mapped or release
 
 
-def _mirror_scene_nfo(
-    target: Path,
-    raw: bytes,
-    atomic_write,
-    roots: list[Path] | None = None,
-) -> Path | None:
-    """Mirror a Scene NFO next to its original-named Usenet hardlink.
+def _replace_with_hardlink(source: Path, target: Path) -> None:
+    """Atomically make target another directory entry for source's inode.
+
+    No byte copy fallback is used. If the two paths cannot be hardlinked, the
+    operation raises and the existing media-library NFO remains authoritative.
+    """
+    if not source.is_file():
+        raise FileNotFoundError(f"NFO hardlink source does not exist: {source}")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if target.exists() and os.path.samefile(source, target):
+            return
+    except OSError:
+        pass
+
+    tmp = target.parent / f".scenenfo-hardlink-{uuid4().hex}.tmp"
+    try:
+        os.link(source, tmp)
+        os.replace(tmp, target)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+
+    if not os.path.samefile(source, target):
+        raise OSError(f"NFO hardlink verification failed: {source} -> {target}")
+
+
+def _mirror_scene_nfo(target: Path, roots: list[Path] | None = None) -> Path | None:
+    """Hardlink a Scene NFO next to its original-named Usenet MKV hardlink.
 
     The destination name is derived from the original MKV itself, never from the
     provider-supplied NFO filename: Original.Release-GROUP.mkv becomes
-    Original.Release-GROUP.nfo.
+    Original.Release-GROUP.nfo. Both NFO paths point to the same inode.
     """
     if target.suffix.lower() != ".nfo" or target.name.casefold() in GENERIC_NFOS:
         return None
@@ -223,24 +249,24 @@ def _mirror_scene_nfo(
     media = _select_media_for_nfo(target)
     if media is None:
         log.warning(
-            "Skipping Usenet NFO mirror for %s: media file could not be resolved uniquely",
+            "Skipping Usenet NFO hardlink for %s: media file could not be resolved uniquely",
             target,
         )
         return None
 
     peer = _find_hardlink_peer(media, roots)
     if peer is None:
-        log.info("No unique Usenet hardlink peer found for %s", media)
+        log.info("No unique Usenet MKV hardlink peer found for %s", media)
         return None
 
-    mirror_target = peer.with_suffix(".nfo")
-    atomic_write(mirror_target, raw)
-    log.info("Mirrored Scene NFO to original release path: %s", mirror_target)
-    return mirror_target
+    usenet_nfo = peer.with_suffix(".nfo")
+    _replace_with_hardlink(target, usenet_nfo)
+    log.info("Hardlinked Scene NFO to original release path: %s -> %s", target, usenet_nfo)
+    return usenet_nfo
 
 
 def install_usenet_nfo_mirror() -> None:
-    """Use original hardlink release names for lookups and mirror successful NFO writes."""
+    """Use original hardlink release names for lookups and hardlink successful NFO writes."""
     global _installed
     if _installed:
         return
@@ -277,17 +303,18 @@ def install_usenet_nfo_mirror() -> None:
     async def crowdnfo_nfo_with_original_name(client, release: str):
         return await original_crowdnfo_nfo(client, _resolve_release_alias(release))
 
-    def mirrored_atomic_write(target: Path, raw: bytes) -> None:
+    def hardlinking_atomic_write(target: Path, raw: bytes) -> None:
         # The media-library write remains authoritative and retains the scanner's
-        # existing atomic-write guarantees. A mirror failure must never roll it back.
+        # existing atomic-write guarantees. The Usenet entry is then relinked to
+        # that exact NFO inode; a link failure never creates a second byte copy.
         original_atomic_write(target, raw)
         try:
-            _mirror_scene_nfo(Path(target), raw, original_atomic_write)
+            _mirror_scene_nfo(Path(target))
         except Exception:
-            log.exception("Usenet NFO mirroring failed for %s", target)
+            log.exception("Usenet NFO hardlinking failed for %s", target)
 
     PreDBClient.exact_release = exact_release_with_original_name
     SRRDBClient.nfo = srrdb_nfo_with_original_name
     CrowdNFOClient.nfo = crowdnfo_nfo_with_original_name
-    ScanManager._atomic_write = staticmethod(mirrored_atomic_write)
+    ScanManager._atomic_write = staticmethod(hardlinking_atomic_write)
     _installed = True
