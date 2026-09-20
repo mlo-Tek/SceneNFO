@@ -9,7 +9,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/mlo-Tek/SceneNFO/issues</Support>
   <Project>https://github.com/mlo-Tek/SceneNFO</Project>
-  <Overview>SceneNFO scans Radarr and Sonarr media libraries, classifies releases as Scene or P2P using exact PreDB.club matches, manages Scene NFO files from srrDB, PreDB.club and crowdNFO, and provides live scans, history, logs, schedules and import automation.</Overview>
+  <Overview>SceneNFO scans Radarr and Sonarr media libraries, classifies releases as Scene or P2P using exact PreDB.club matches, manages Scene NFO files from srrDB, PreDB.club and crowdNFO, mirrors Scene NFOs next to matching original-named Usenet hardlinks, and provides live scans, history, logs, schedules and import automation.</Overview>
   <Category>MediaApp:Other Tools:</Category>
   <WebUI>http://[IP]:[PORT:8787]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/mlo-Tek/SceneNFO/main/unraid/SceneNFO.xml</TemplateURL>
@@ -20,13 +20,15 @@
   <DateInstalled/>
   <DonateText/>
   <DonateLink/>
-  <Requires>Internet access is required for PreDB.club, srrDB and crowdNFO. The GHCR package must be public so Unraid can pull the image without registry credentials.</Requires>
+  <Requires>Internet access is required for PreDB.club, srrDB and crowdNFO. The Usenet mount is required for hardlink NFO mirroring. The GHCR package must be public so Unraid can pull the image without registry credentials.</Requires>
 
   <Config Name="WebUI Port" Target="8787" Default="8787" Mode="tcp" Description="SceneNFO WebUI / API port." Type="Port" Display="always" Required="true" Mask="false">8787</Config>
 
   <Config Name="Appdata" Target="/config" Default="/mnt/cache/appdata/scenenfo/config" Mode="rw" Description="Persistent SceneNFO configuration, SQLite database, encrypted credentials, logs and temporary files." Type="Path" Display="always" Required="true" Mask="false">/mnt/cache/appdata/scenenfo/config</Config>
 
   <Config Name="Media" Target="/data/media" Default="/mnt/user/data/media" Mode="rw" Description="Radarr and Sonarr media root. SceneNFO needs write access when Apply mode is used to create or replace NFO files. You can set this to read-only for initial Dry Run testing." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/data/media</Config>
+
+  <Config Name="Usenet Hardlinks" Target="/data/usenet" Default="/mnt/user/data/usenet" Mode="rw" Description="Original-named Usenet hardlink tree. SceneNFO uses inode matching to find the corresponding MKV and mirrors the Scene NFO beside it using the original release filename." Type="Path" Display="always" Required="false" Mask="false">/mnt/user/data/usenet</Config>
 
   <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Container timezone." Type="Variable" Display="advanced" Required="true" Mask="false">Europe/Berlin</Config>
 
