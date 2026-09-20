@@ -68,6 +68,26 @@ Apply mode is deliberately conservative:
 - Movie replacement is constrained to the matching movie folder.
 - TV replacement is constrained by the episode key (`SxxEyy`, including multi-episode forms where applicable).
 
+### Original-release Usenet hardlinks
+
+SceneNFO can integrate with a Usenet hardlink tree mounted at `/data/usenet`.
+
+When Radarr or Sonarr has renamed an imported MKV under `/data/media`, SceneNFO can locate the original-release-named MKV under `/data/usenet` by matching the actual filesystem identity of the file (`device + inode + size`). The original release name is then used for PreDB.club, srrDB and crowdNFO lookups instead of guessing from the renamed media filename.
+
+After SceneNFO writes the validated NFO under `/data/media`, it creates the original-release-named NFO beside the matching MKV under `/data/usenet` as a **real hardlink to the media NFO**:
+
+```text
+/data/media/movies/Movie (2026)/Downloaded.Scene.NFO-GROUP.nfo
+                                  │
+                                  └── same inode
+                                       │
+/data/usenet/movies/Original.Release-GROUP/Original.Release-GROUP.nfo
+```
+
+This does **not** store the NFO bytes twice. Both paths are directory entries for the same inode. Existing independent NFO files in the Usenet release folder are atomically replaced by the hardlink. SceneNFO deliberately has **no copy fallback**: if a true hardlink cannot be created, the authoritative NFO under `/data/media` remains intact and the Usenet hardlink failure is logged.
+
+If no unique MKV hardlink peer can be identified, SceneNFO does not create an NFO under `/data/usenet`.
+
 ## Web UI
 
 SceneNFO includes a responsive desktop-style web interface with:
@@ -177,8 +197,9 @@ Default container configuration:
 | Web UI / API | `8787/tcp` | `8787` |
 | Persistent config | `/config` | `/mnt/cache/appdata/scenenfo/config` |
 | Media libraries | `/data/media` | `/mnt/user/data/media` |
+| Original Usenet hardlinks | `/data/usenet` | `/mnt/user/data/usenet` |
 
-SceneNFO needs write access to the media mount when **Apply** mode is used. For initial testing you can mount the media path read-only and use Dry Run.
+SceneNFO needs write access to the media mount when **Apply** mode is used. The `/data/usenet` mount also needs write access when NFO hardlinking is enabled. For initial testing you can mount the media path read-only and use Dry Run.
 
 Example:
 
@@ -191,6 +212,7 @@ docker run -d \
   -e SCENENFO_CONFIG_DIR=/config \
   -v /mnt/cache/appdata/scenenfo/config:/config \
   -v /mnt/user/data/media:/data/media \
+  -v /mnt/user/data/usenet:/data/usenet \
   ghcr.io/mlo-tek/scenenfo:latest
 ```
 
@@ -211,8 +233,9 @@ docker compose up -d --build
 The included `docker-compose.yml` uses these default mappings:
 
 ```text
-/config     -> /mnt/cache/appdata/scenenfo/config
-/data/media -> /mnt/user/data/media
+/config      -> /mnt/cache/appdata/scenenfo/config
+/data/media  -> /mnt/user/data/media
+/data/usenet -> /mnt/user/data/usenet
 ```
 
 Default library paths inside the container are:
@@ -228,9 +251,10 @@ Default library paths inside the container are:
 2. Configure your Movies and TV library roots.
 3. Configure srrDB, PreDB.club and crowdNFO as required.
 4. Add Radarr and/or Sonarr connection details if you want import automation and refresh integration.
-5. Run the selected library in **Dry Run** first.
-6. Review the results and only then enable **Apply** if the proposed NFO changes are correct.
-7. Configure schedules and Discord summaries only if needed.
+5. Mount `/mnt/user/data/usenet` as `/data/usenet` with read/write access if you want original-release lookup and NFO hardlinking.
+6. Run the selected library in **Dry Run** first.
+7. Review the results and only then enable **Apply** if the proposed NFO changes are correct.
+8. Configure schedules and Discord summaries only if needed.
 
 Internet access is required for PreDB.club, srrDB and crowdNFO lookups.
 
@@ -295,6 +319,6 @@ done
 
 ## Project status
 
-SceneNFO is under active development. The current `main` branch includes the modern desktop UI, multiple-library support, targeted Radarr/Sonarr import processing, incremental scanning, path reconciliation, run review/history, Discord weekly summaries and the Recently added dashboard.
+SceneNFO is under active development. The current `main` branch includes the modern desktop UI, multiple-library support, targeted Radarr/Sonarr import processing, incremental scanning, path reconciliation, run review/history, Discord weekly summaries, the Recently added dashboard and original-release Usenet NFO hardlinking.
 
 For bugs and feature requests, use the GitHub issue tracker.
